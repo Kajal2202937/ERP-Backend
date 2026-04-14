@@ -2,6 +2,8 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const connectDB = require("./config/db");
+const contactRoutes = require("./routes/contactRoutes");
+const insightRoutes = require("./routes/insightRoutes");
 
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -26,6 +28,8 @@ app.use("/api/suppliers", supplierRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/production", productionRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/contact", contactRoutes);
+app.use("/api/insights", insightRoutes);
 
 app.get("/", (req, res) => {
   res.send("ERP API Running 🚀");

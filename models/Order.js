@@ -14,6 +14,16 @@ const orderSchema = new mongoose.Schema(
       min: 1,
     },
 
+    price: {
+      type: Number,
+      required: true,
+    },
+
+    costPrice: {
+      type: Number,
+      required: true,
+    },
+
     totalPrice: {
       type: Number,
       required: true,
@@ -22,7 +32,7 @@ const orderSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ["pending", "completed", "cancelled"],
-      default: "pending",
+      default: "completed",
     },
   },
   { timestamps: true },

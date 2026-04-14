@@ -33,6 +33,12 @@ const productSchema = new mongoose.Schema(
       trim: true,
     },
 
+    costPrice: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
     supplier: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Supplier",

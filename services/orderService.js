@@ -3,7 +3,7 @@ const Product = require("../models/Product");
 const Inventory = require("../models/Inventory");
 
 // CREATE ORDER
-exports.createOrder = async (data) => {
+const createOrder = async (data) => {
   const { product, quantity } = data;
 
   if (!product || !quantity) {
@@ -13,19 +13,32 @@ exports.createOrder = async (data) => {
   const productData = await Product.findById(product);
   if (!productData) throw new Error("Product not found");
 
-  const inventory = await Inventory.findOne({ product });
+  // ✅ IMPORTANT FIX
+  if (productData.costPrice === undefined || productData.costPrice === null) {
+    throw new Error("Product cost price is missing. Please update product first.");
+  }
+
+  const inventory = await Inventory.findOne({
+    product: productData._id,
+  });
+
   if (!inventory) throw new Error("Inventory not found");
 
   if (inventory.quantity < quantity) {
     throw new Error("Insufficient stock");
   }
 
-  const totalPrice = productData.price * quantity;
+  const price = productData.price;
+  const costPrice = productData.costPrice;
+  const totalPrice = price * quantity;
 
   const order = await Order.create({
-    product,
+    product: productData._id,
     quantity,
+    price,
+    costPrice,
     totalPrice,
+    status: "completed",
   });
 
   inventory.quantity -= quantity;
@@ -33,9 +46,8 @@ exports.createOrder = async (data) => {
 
   return order;
 };
-
-// GET ORDERS (✅ SUPPLIER FIX HERE)
-exports.getOrders = async (query) => {
+// GET ORDERS
+const getOrders = async (query) => {
   let { page = 1, limit = 10, search = "", status } = query;
 
   page = parseInt(page);
@@ -55,29 +67,28 @@ exports.getOrders = async (query) => {
     .sort({ createdAt: -1 });
 
   if (search) {
+    const keyword = search.toLowerCase();
     orders = orders.filter((o) =>
-      o.product?.name?.toLowerCase().includes(search.toLowerCase())
+      o.product?.name?.toLowerCase().includes(keyword),
     );
   }
 
   const total = orders.length;
   const pages = Math.ceil(total / limit);
 
-  const paginated = orders.slice(
-    (page - 1) * limit,
-    page * limit
-  );
+  const paginated = orders.slice((page - 1) * limit, page * limit);
 
-  return {
-    data: paginated,
-    total,
-    page,
-    pages,
-  };
+  return { data: paginated, total, page, pages };
 };
 
 // UPDATE STATUS
-exports.updateOrderStatus = async (id, status) => {
+const updateOrderStatus = async (id, status) => {
+  const allowed = ["pending", "completed", "cancelled"];
+
+  if (!allowed.includes(status)) {
+    throw new Error("Invalid status");
+  }
+
   const order = await Order.findById(id);
   if (!order) throw new Error("Order not found");
 
@@ -88,7 +99,7 @@ exports.updateOrderStatus = async (id, status) => {
 };
 
 // DELETE ORDER
-exports.deleteOrder = async (id) => {
+const deleteOrder = async (id) => {
   const order = await Order.findById(id);
   if (!order) throw new Error("Order not found");
 
@@ -104,4 +115,11 @@ exports.deleteOrder = async (id) => {
   await Order.findByIdAndDelete(id);
 
   return { message: "Order deleted & stock restored" };
+};
+
+module.exports = {
+  createOrder,
+  getOrders,
+  updateOrderStatus,
+  deleteOrder,
 };

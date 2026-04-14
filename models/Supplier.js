@@ -8,7 +8,6 @@ const supplierSchema = new mongoose.Schema(
     phone: { type: String, required: true },
     address: { type: String, default: "" },
 
-    // 🔥 FIX: status field (YOU WERE USING IT IN UI BUT NOT IN DB)
     active: { type: Boolean, default: true },
   },
   { timestamps: true },

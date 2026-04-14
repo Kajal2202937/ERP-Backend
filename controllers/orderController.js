@@ -5,31 +5,31 @@ exports.createOrder = async (req, res) => {
   try {
     const order = await orderService.createOrder(req.body);
 
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
       data: order,
     });
   } catch (err) {
     console.error("CREATE ORDER ERROR:", err.message);
 
-    return res.status(400).json({
+    res.status(400).json({
       success: false,
       message: err.message,
     });
   }
 };
 
-// GET ORDERS (pagination + filter + search)
+// GET ORDERS
 exports.getOrders = async (req, res) => {
   try {
     const data = await orderService.getOrders(req.query);
 
-    return res.json({
+    res.json({
       success: true,
       ...data,
     });
   } catch (err) {
-    return res.status(400).json({
+    res.status(400).json({
       success: false,
       message: err.message,
     });
@@ -41,15 +41,15 @@ exports.updateOrderStatus = async (req, res) => {
   try {
     const order = await orderService.updateOrderStatus(
       req.params.id,
-      req.body.status
+      req.body.status,
     );
 
-    return res.json({
+    res.json({
       success: true,
       data: order,
     });
   } catch (err) {
-    return res.status(400).json({
+    res.status(400).json({
       success: false,
       message: err.message,
     });
@@ -61,12 +61,12 @@ exports.deleteOrder = async (req, res) => {
   try {
     const result = await orderService.deleteOrder(req.params.id);
 
-    return res.json({
+    res.json({
       success: true,
       message: result.message,
     });
   } catch (err) {
-    return res.status(400).json({
+    res.status(400).json({
       success: false,
       message: err.message,
     });

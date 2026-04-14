@@ -1,11 +1,14 @@
 const express = require("express");
 const router = express.Router();
 
-const reportController = require("../controllers/reportController");
+const {
+  getSalesSummary,
+  getSalesTrend,
+  getTopProducts,
+} = require("../controllers/reportController");
 
-router.get("/sales", reportController.getSalesReport);
-router.get("/sales-trend", reportController.getSalesTrend);
-router.get("/insights", reportController.getInsights);
-router.get("/top-products", reportController.getTopProducts);
+router.get("/sales", getSalesSummary);
+router.get("/sales-trend", getSalesTrend);
+router.get("/top-products", getTopProducts);
 
 module.exports = router;
