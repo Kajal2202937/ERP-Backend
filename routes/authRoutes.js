@@ -5,11 +5,17 @@ const {
   registerUser,
   loginUser,
   logoutUser,
+  changePassword,
 } = require("../controllers/authController");
 
-// Routes
+const { protect } = require("../middleware/authMiddleware");
+
+
 router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.post("/logout", logoutUser);
+
+
+router.post("/change-password", protect, changePassword);
 
 module.exports = router;

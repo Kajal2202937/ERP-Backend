@@ -1,5 +1,6 @@
 const Contact = require("../models/Contact");
 
+
 const createContact = async (data) => {
   const { name, email, subject, message } = data;
 
@@ -17,21 +18,24 @@ const createContact = async (data) => {
   return contact;
 };
 
+
 const getAllContacts = async () => {
   return await Contact.find().sort({ createdAt: -1 });
 };
+
 
 const updateContactStatus = async (id, status) => {
   const contact = await Contact.findByIdAndUpdate(
     id,
     { status },
-    { new: true }
+    { new: true },
   );
 
   if (!contact) throw new Error("Contact not found");
 
   return contact;
 };
+
 
 const deleteContact = async (id) => {
   const contact = await Contact.findByIdAndDelete(id);
@@ -41,9 +45,28 @@ const deleteContact = async (id) => {
   return true;
 };
 
+
+const addReply = async (id, message) => {
+  const contact = await Contact.findById(id);
+  if (!contact) throw new Error("Contact not found");
+
+  contact.replies.push({
+    message, 
+    sender: "admin",
+    createdAt: new Date(),
+  });
+
+  contact.status = "replied";
+
+  await contact.save();
+
+  return contact;
+};
+
 module.exports = {
   createContact,
   getAllContacts,
   updateContactStatus,
   deleteContact,
+  addReply,
 };

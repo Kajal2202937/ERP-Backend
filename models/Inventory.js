@@ -30,7 +30,7 @@ const inventorySchema = new mongoose.Schema(
       default: true,
     },
 
-    archived: { // ✅ FIX ADDED
+    archived: { 
       type: Boolean,
       default: false,
     },

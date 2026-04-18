@@ -1,24 +1,26 @@
 const Order = require("../models/Order");
+const Product = require("../models/Product");
 
-// DATE FILTER
 const getDateFilter = (startDate, endDate) => {
-  if (!startDate || !endDate) return {};
-  return {
-    createdAt: {
-      $gte: new Date(startDate),
-      $lte: new Date(endDate),
-    },
-  };
+  const filter = {};
+
+  if (startDate && !isNaN(new Date(startDate))) {
+    filter.$gte = new Date(startDate);
+  }
+
+  if (endDate && !isNaN(new Date(endDate))) {
+    filter.$lte = new Date(endDate);
+  }
+
+  return Object.keys(filter).length ? { createdAt: filter } : {};
 };
 
-// SALES SUMMARY (UPGRADED)
 const getSalesSummaryService = async (startDate, endDate) => {
   const match = getDateFilter(startDate, endDate);
 
   const result = await Order.aggregate([
     { $match: match },
 
-    // CALCULATIONS
     {
       $addFields: {
         revenue: { $ifNull: ["$totalPrice", 0] },
@@ -32,7 +34,6 @@ const getSalesSummaryService = async (startDate, endDate) => {
       },
     },
 
-    // GROUP TOTALS
     {
       $group: {
         _id: null,
@@ -43,7 +44,6 @@ const getSalesSummaryService = async (startDate, endDate) => {
       },
     },
 
-    // FINAL OUTPUT (WITH PROFIT MARGIN)
     {
       $project: {
         _id: 0,
@@ -55,7 +55,6 @@ const getSalesSummaryService = async (startDate, endDate) => {
           $subtract: ["$totalRevenue", "$totalCost"],
         },
 
-        // 🔥 NEW: PROFIT MARGIN %
         profitMargin: {
           $cond: [
             { $eq: ["$totalRevenue", 0] },
@@ -75,7 +74,7 @@ const getSalesSummaryService = async (startDate, endDate) => {
                     100,
                   ],
                 },
-                2, // 2 decimal places
+                2,
               ],
             },
           ],
@@ -90,12 +89,11 @@ const getSalesSummaryService = async (startDate, endDate) => {
       totalQuantity: 0,
       totalRevenue: 0,
       profit: 0,
-      profitMargin: 0, // ✅ added
+      profitMargin: 0,
     }
   );
 };
 
-// SALES TREND (UNCHANGED + SAFE)
 const getSalesTrendService = async (startDate, endDate) => {
   const match = getDateFilter(startDate, endDate);
 
@@ -124,7 +122,6 @@ const getSalesTrendService = async (startDate, endDate) => {
   }));
 };
 
-// TOP PRODUCTS (UNCHANGED)
 const getTopProductsService = async () => {
   const result = await Order.aggregate([
     {
@@ -136,6 +133,27 @@ const getTopProductsService = async () => {
 
     { $sort: { totalSold: -1 } },
     { $limit: 5 },
+
+    {
+      $lookup: {
+        from: "products",
+        localField: "_id",
+        foreignField: "_id",
+        as: "product",
+      },
+    },
+
+    { $unwind: "$product" },
+
+    {
+      $project: {
+        _id: 0,
+        productId: "$product._id",
+        name: "$product.name",
+        category: "$product.category",
+        totalSold: 1,
+      },
+    },
   ]);
 
   return result;

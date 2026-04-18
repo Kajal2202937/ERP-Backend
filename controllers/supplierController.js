@@ -1,6 +1,5 @@
 const supplierService = require("../services/supplierService");
 
-// CREATE
 exports.createSupplier = async (req, res) => {
   try {
     const data = await supplierService.createSupplier(req.body);
@@ -10,72 +9,119 @@ exports.createSupplier = async (req, res) => {
       data,
     });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    res.status(400).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
-// GET
 exports.getSuppliers = async (req, res) => {
   try {
-    const data = await supplierService.getSuppliers(req.query);
+    const result = await supplierService.getSuppliers(req.query);
 
     res.json({
       success: true,
-      data: data.data,
-      meta: {
-        total: data.total,
-        page: data.page,
-        pages: data.pages,
+      data: {
+        data: result.data,
+        total: result.total,
+        totalPages: result.totalPages,
+        activeCount: result.activeCount,
+        productCount: result.productCount,
+        stockValue: result.stockValue,
       },
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
-// UPDATE
 exports.updateSupplier = async (req, res) => {
   try {
-    const data = await supplierService.updateSupplier(
-      req.params.id,
-      req.body
-    );
+    const data = await supplierService.updateSupplier(req.params.id, req.body);
 
-    res.json({ success: true, data });
+    res.json({
+      success: true,
+      data,
+    });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    res.status(400).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
-// DELETE
 exports.deleteSupplier = async (req, res) => {
   try {
     await supplierService.deleteSupplier(req.params.id);
 
-    res.json({ success: true });
+    res.json({
+      success: true,
+    });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    res.status(400).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
-// ✅ BULK DELETE (FIXED NAME)
 exports.bulkDeleteSuppliers = async (req, res) => {
   try {
-    await supplierService.bulkDelete(req.body.ids);
+    const ids = req.body.ids;
 
-    res.json({ success: true });
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No supplier IDs provided",
+      });
+    }
+
+    await supplierService.bulkDelete(ids);
+
+    res.json({
+      success: true,
+    });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    res.status(400).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
-// ✅ TOGGLE STATUS (FIXED NAME)
 exports.toggleSupplierStatus = async (req, res) => {
   try {
     const data = await supplierService.toggleStatus(req.params.id);
 
-    res.json({ success: true, data });
+    res.json({
+      success: true,
+      data,
+    });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+exports.getSupplierAnalytics = async (req, res) => {
+  try {
+    const data = await supplierService.getSupplierAnalytics();
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };

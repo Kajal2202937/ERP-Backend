@@ -1,8 +1,6 @@
 const Inventory = require("../models/Inventory");
+const { updateStock: stockEngine } = require("./stockService");
 
-// =========================
-// CREATE INVENTORY
-// =========================
 exports.createInventory = async (data) => {
   if (!data.product) throw new Error("Product is required");
 
@@ -22,9 +20,6 @@ exports.createInventory = async (data) => {
   });
 };
 
-// =========================
-// GET INVENTORY (AGGREGATION FIXED)
-// =========================
 exports.getInventory = async (query) => {
   const page = Math.max(parseInt(query.page) || 1, 1);
   const limit = Math.max(parseInt(query.limit) || 10, 1);
@@ -33,10 +28,9 @@ exports.getInventory = async (query) => {
   const search = query.search?.trim();
 
   const match = {
-    archived: { $ne: true }, // ✅ exclude archived
+    archived: { $ne: true },
   };
 
-  // STOCK FILTER
   if (query.stock === "low") {
     match.quantity = { $gt: 0, $lte: 10 };
   }
@@ -45,7 +39,6 @@ exports.getInventory = async (query) => {
     match.quantity = 0;
   }
 
-  // STATUS FILTER
   if (query.status === "active") {
     match.isActive = true;
   }
@@ -65,7 +58,6 @@ exports.getInventory = async (query) => {
     },
     { $unwind: "$product" },
 
-    // 🔍 SEARCH (FIXED)
     ...(search
       ? [
           {
@@ -103,9 +95,6 @@ exports.getInventory = async (query) => {
   };
 };
 
-// =========================
-// ADD STOCK
-// =========================
 exports.addStock = async (productId, qty) => {
   const quantity = Number(qty);
 
@@ -125,15 +114,15 @@ exports.addStock = async (productId, qty) => {
     });
   }
 
-  inventory.quantity += quantity;
-  inventory.lastUpdated = new Date();
+  await stockEngine({
+    productId,
+    quantity,
+    type: "IN",
+  });
 
-  return await inventory.save();
+  return await Inventory.findOne({ product: productId });
 };
 
-// =========================
-// UPDATE STOCK
-// =========================
 exports.updateStock = async (productId, qty) => {
   const quantity = Number(qty);
 
@@ -146,15 +135,19 @@ exports.updateStock = async (productId, qty) => {
 
   if (!inventory) throw new Error("Inventory not found");
 
-  inventory.quantity = quantity;
-  inventory.lastUpdated = new Date();
+  const diff = quantity - inventory.quantity;
 
-  return await inventory.save();
+  if (diff === 0) return inventory;
+
+  await stockEngine({
+    productId,
+    quantity: Math.abs(diff),
+    type: diff > 0 ? "IN" : "OUT",
+  });
+
+  return await Inventory.findOne({ product: productId });
 };
 
-// =========================
-// DISABLE
-// =========================
 exports.disableInventory = async (productId) => {
   if (!productId) throw new Error("productId is required");
 
@@ -169,9 +162,6 @@ exports.disableInventory = async (productId) => {
   return inventory;
 };
 
-// =========================
-// ENABLE
-// =========================
 exports.enableInventory = async (productId) => {
   if (!productId) throw new Error("productId is required");
 
@@ -186,9 +176,6 @@ exports.enableInventory = async (productId) => {
   return inventory;
 };
 
-// =========================
-// DELETE (SOFT)
-// =========================
 exports.deleteInventory = async (productIds) => {
   const ids = Array.isArray(productIds) ? productIds : [productIds];
 

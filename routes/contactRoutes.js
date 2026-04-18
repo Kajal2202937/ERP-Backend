@@ -6,32 +6,17 @@ const {
   getContacts,
   updateContact,
   deleteContact,
+  replyContact,
 } = require("../controllers/contactController");
 
 const { protect } = require("../middleware/authMiddleware");
 
-/**
- * ================================
- * PUBLIC ROUTE
- * ================================
- */
-
-// Send contact message (no auth)
 router.post("/", createContact);
 
-/**
- * ================================
- * PROTECTED ROUTES (AUTH ONLY)
- * ================================
- */
-
-// Get all messages
 router.get("/", protect, getContacts);
-
-// Update message
 router.put("/:id", protect, updateContact);
-
-// Delete message
 router.delete("/:id", protect, deleteContact);
+
+router.post("/:id/reply", protect, replyContact);
 
 module.exports = router;

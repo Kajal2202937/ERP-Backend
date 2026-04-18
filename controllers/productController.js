@@ -1,6 +1,6 @@
 const productService = require("../services/productService");
 
-// CREATE
+
 exports.createProduct = async (req, res) => {
   try {
     const product = await productService.createProduct(req.body);
@@ -17,7 +17,7 @@ exports.createProduct = async (req, res) => {
   }
 };
 
-// GET ALL
+
 exports.getProducts = async (req, res) => {
   try {
     const result = await productService.getAllProducts(req.query);
@@ -34,7 +34,7 @@ exports.getProducts = async (req, res) => {
   }
 };
 
-// GET ONE
+
 exports.getProduct = async (req, res) => {
   try {
     const product = await productService.getProductById(req.params.id);
@@ -51,7 +51,7 @@ exports.getProduct = async (req, res) => {
   }
 };
 
-// UPDATE
+
 exports.updateProduct = async (req, res) => {
   try {
     const product = await productService.updateProduct(req.params.id, req.body);
@@ -68,7 +68,7 @@ exports.updateProduct = async (req, res) => {
   }
 };
 
-// DELETE
+
 exports.deleteProduct = async (req, res) => {
   try {
     await productService.deleteProduct(req.params.id);
@@ -85,7 +85,7 @@ exports.deleteProduct = async (req, res) => {
   }
 };
 
-// LOW STOCK
+
 exports.getLowStockProducts = async (req, res) => {
   try {
     const products = await productService.getLowStockProducts();

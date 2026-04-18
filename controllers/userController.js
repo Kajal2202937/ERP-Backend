@@ -1,15 +1,11 @@
 const User = require("../models/User");
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs"); // 🔐 For hashing
+const bcrypt = require("bcryptjs");
 
-// ================= CREATE =================
-
-// 👑 Admin creates new user
 exports.createUser = async (req, res) => {
   try {
     const { name, email, password, role, phone } = req.body;
 
-    // 🔐 Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
@@ -29,9 +25,6 @@ exports.createUser = async (req, res) => {
   }
 };
 
-// ================= READ =================
-
-// 👤 Get logged-in user
 exports.getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -45,7 +38,6 @@ exports.getMe = async (req, res) => {
   }
 };
 
-// 👑 Admin + Manager → get all users
 exports.getUsers = async (req, res) => {
   try {
     const users = await User.find();
@@ -60,7 +52,6 @@ exports.getUsers = async (req, res) => {
   }
 };
 
-// 👑 Admin + Manager → get user by ID
 exports.getUserById = async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -82,14 +73,10 @@ exports.getUserById = async (req, res) => {
   }
 };
 
-// ================= UPDATE =================
-
-// 👤 User → update own profile
 exports.updateMe = async (req, res) => {
   try {
-    delete req.body.role; // ❌ Prevent role change
+    delete req.body.role;
 
-    // 🔐 Hash password if updating
     if (req.body.password) {
       req.body.password = await bcrypt.hash(req.body.password, 10);
     }
@@ -107,19 +94,16 @@ exports.updateMe = async (req, res) => {
   }
 };
 
-// 👑 Admin + Manager → update any user
 exports.updateUser = async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: "Invalid user ID" });
     }
 
-    // ❌ Manager cannot change role
     if (req.user.role !== "admin") {
       delete req.body.role;
     }
 
-    // 🔐 Hash password if updating
     if (req.body.password) {
       req.body.password = await bcrypt.hash(req.body.password, 10);
     }
@@ -137,9 +121,6 @@ exports.updateUser = async (req, res) => {
   }
 };
 
-// ================= DELETE =================
-
-// 👤 User → delete own account
 exports.deleteMe = async (req, res) => {
   try {
     await User.findByIdAndDelete(req.user.id);
@@ -153,7 +134,6 @@ exports.deleteMe = async (req, res) => {
   }
 };
 
-// 👑 Admin ONLY → delete any user
 exports.deleteUser = async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {

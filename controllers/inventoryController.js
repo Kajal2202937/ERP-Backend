@@ -1,8 +1,5 @@
 const inventoryService = require("../services/inventoryService");
 
-// ============================
-// CREATE INVENTORY
-// ============================
 exports.createInventory = async (req, res) => {
   try {
     const data = await inventoryService.createInventory(req.body);
@@ -19,9 +16,6 @@ exports.createInventory = async (req, res) => {
   }
 };
 
-// ============================
-// GET INVENTORY (PAGINATION + FILTERS)
-// ============================
 exports.getInventory = async (req, res) => {
   try {
     const result = await inventoryService.getInventory(req.query);
@@ -38,19 +32,13 @@ exports.getInventory = async (req, res) => {
   }
 };
 
-// ============================
-// ADD STOCK
-// ============================
 exports.addStock = async (req, res) => {
   try {
     const { productId, quantity } = req.body;
 
     const data = await inventoryService.addStock(productId, quantity);
 
-    res.json({
-      success: true,
-      data,
-    });
+    res.json({ success: true, data });
   } catch (error) {
     res.status(400).json({
       success: false,
@@ -59,19 +47,13 @@ exports.addStock = async (req, res) => {
   }
 };
 
-// ============================
-// UPDATE STOCK (ABSOLUTE VALUE)
-// ============================
 exports.updateStock = async (req, res) => {
   try {
     const { productId, quantity } = req.body;
 
     const data = await inventoryService.updateStock(productId, quantity);
 
-    res.json({
-      success: true,
-      data,
-    });
+    res.json({ success: true, data });
   } catch (error) {
     res.status(400).json({
       success: false,
@@ -80,19 +62,13 @@ exports.updateStock = async (req, res) => {
   }
 };
 
-// ============================
-// DISABLE INVENTORY (ERP SAFE)
-// ============================
 exports.disableInventory = async (req, res) => {
   try {
     const { productId } = req.body;
 
     const data = await inventoryService.disableInventory(productId);
 
-    res.json({
-      success: true,
-      data,
-    });
+    res.json({ success: true, data });
   } catch (error) {
     res.status(400).json({
       success: false,
@@ -101,19 +77,13 @@ exports.disableInventory = async (req, res) => {
   }
 };
 
-// ============================
-// ENABLE INVENTORY
-// ============================
 exports.enableInventory = async (req, res) => {
   try {
     const { productId } = req.body;
 
     const data = await inventoryService.enableInventory(productId);
 
-    res.json({
-      success: true,
-      data,
-    });
+    res.json({ success: true, data });
   } catch (error) {
     res.status(400).json({
       success: false,
@@ -122,19 +92,13 @@ exports.enableInventory = async (req, res) => {
   }
 };
 
-// ============================
-// DELETE INVENTORY (SOFT ARCHIVE)
-// ============================
 exports.deleteInventory = async (req, res) => {
   try {
     const { productIds } = req.body;
 
     const data = await inventoryService.deleteInventory(productIds);
 
-    res.json({
-      success: true,
-      data,
-    });
+    res.json({ success: true, data });
   } catch (error) {
     res.status(400).json({
       success: false,

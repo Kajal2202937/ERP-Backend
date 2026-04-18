@@ -1,8 +1,8 @@
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const Inventory = require("../models/Inventory");
+const { updateStock } = require("./stockService");
 
-// CREATE ORDER
 const createOrder = async (data) => {
   const { product, quantity } = data;
 
@@ -10,43 +10,56 @@ const createOrder = async (data) => {
     throw new Error("Product and quantity are required");
   }
 
+  const qty = Number(quantity);
+  if (isNaN(qty) || qty <= 0) {
+    throw new Error("Invalid quantity");
+  }
+
   const productData = await Product.findById(product);
   if (!productData) throw new Error("Product not found");
 
-  // ✅ IMPORTANT FIX
   if (productData.costPrice === undefined || productData.costPrice === null) {
-    throw new Error("Product cost price is missing. Please update product first.");
+    throw new Error(
+      "Product cost price is missing. Please update product first.",
+    );
   }
 
-  const inventory = await Inventory.findOne({
-    product: productData._id,
-  });
-
+  const inventory = await Inventory.findOne({ product: productData._id });
   if (!inventory) throw new Error("Inventory not found");
 
-  if (inventory.quantity < quantity) {
+  if (inventory.quantity < qty) {
     throw new Error("Insufficient stock");
   }
 
   const price = productData.price;
   const costPrice = productData.costPrice;
-  const totalPrice = price * quantity;
+  const totalPrice = price * qty;
 
   const order = await Order.create({
     product: productData._id,
-    quantity,
+    quantity: qty,
     price,
     costPrice,
     totalPrice,
     status: "completed",
   });
 
-  inventory.quantity -= quantity;
-  await inventory.save();
+  try {
+    await updateStock({
+      productId: productData._id,
+      quantity: qty,
+      type: "OUT",
+      source: "ORDER",
+      referenceId: order._id,
+    });
+  } catch (err) {
+    await Order.findByIdAndDelete(order._id);
+    throw err;
+  }
 
   return order;
 };
-// GET ORDERS
+
 const getOrders = async (query) => {
   let { page = 1, limit = 10, search = "", status } = query;
 
@@ -81,7 +94,6 @@ const getOrders = async (query) => {
   return { data: paginated, total, page, pages };
 };
 
-// UPDATE STATUS
 const updateOrderStatus = async (id, status) => {
   const allowed = ["pending", "completed", "cancelled"];
 
@@ -92,25 +104,33 @@ const updateOrderStatus = async (id, status) => {
   const order = await Order.findById(id);
   if (!order) throw new Error("Order not found");
 
+  if (order.status !== "cancelled" && status === "cancelled") {
+    await updateStock({
+      productId: order.product,
+      quantity: order.quantity,
+      type: "IN",
+      source: "ORDER_CANCEL",
+      referenceId: order._id,
+    });
+  }
+
   order.status = status;
   await order.save();
 
   return order;
 };
 
-// DELETE ORDER
 const deleteOrder = async (id) => {
   const order = await Order.findById(id);
   if (!order) throw new Error("Order not found");
 
-  const inventory = await Inventory.findOne({
-    product: order.product,
+  await updateStock({
+    productId: order.product,
+    quantity: order.quantity,
+    type: "IN",
+    source: "ORDER_DELETE",
+    referenceId: order._id,
   });
-
-  if (inventory) {
-    inventory.quantity += order.quantity;
-    await inventory.save();
-  }
 
   await Order.findByIdAndDelete(id);
 

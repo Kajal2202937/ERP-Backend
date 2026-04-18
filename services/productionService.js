@@ -1,7 +1,7 @@
 const Production = require("../models/Production");
 const Inventory = require("../models/Inventory");
+const { updateStock } = require("./stockService");
 
-// ---------------- CREATE ----------------
 exports.createProduction = async (data) => {
   if (!data.product || !data.quantityProduced) {
     throw new Error("Product and quantity are required");
@@ -13,22 +13,18 @@ exports.createProduction = async (data) => {
 
   const production = await Production.create({
     ...data,
-    statusHistory: [
-      { status: "started", changedAt: new Date() },
-    ],
+    statusHistory: [{ status: "started", changedAt: new Date() }],
   });
 
   return production;
 };
 
-// ---------------- GET ALL ----------------
 exports.getProductions = async () => {
   return await Production.find()
     .populate("product", "name")
     .sort({ createdAt: -1 });
 };
 
-// ---------------- UPDATE ----------------
 exports.updateProduction = async (id, data) => {
   const old = await Production.findById(id);
   if (!old) throw new Error("Production not found");
@@ -43,7 +39,6 @@ exports.updateProduction = async (id, data) => {
     new: true,
   });
 
-  // ---------------- STATUS HISTORY ----------------
   if (data.status && data.status !== old.status) {
     updated.statusHistory.push({
       status: data.status,
@@ -53,37 +48,31 @@ exports.updateProduction = async (id, data) => {
     await updated.save();
   }
 
-  // ---------------- INVENTORY UPDATE (SAFE) ----------------
   const wasCompleted = old.status === "completed";
   const nowCompleted = updated.status === "completed";
 
   if (!wasCompleted && nowCompleted) {
-    await Inventory.findOneAndUpdate(
-      { product: updated.product },
-      {
-        $inc: { quantity: updated.quantityProduced },
-      },
-      { upsert: true, new: true }
-    );
+    await updateStock({
+      productId: updated.product,
+      quantity: updated.quantityProduced,
+      type: "IN",
+    });
   }
 
   return updated;
 };
 
-// ---------------- DELETE (WITH ROLLBACK) ----------------
 exports.deleteProduction = async (id) => {
   const prod = await Production.findById(id);
 
   if (!prod) throw new Error("Production not found");
 
-  // rollback inventory if already completed
   if (prod.status === "completed") {
-    await Inventory.findOneAndUpdate(
-      { product: prod.product },
-      {
-        $inc: { quantity: -prod.quantityProduced },
-      }
-    );
+    await updateStock({
+      productId: prod.product,
+      quantity: prod.quantityProduced,
+      type: "OUT",
+    });
   }
 
   return await Production.findByIdAndDelete(id);
