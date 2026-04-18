@@ -1,30 +1,21 @@
-
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-
 
 if (!process.env.JWT_SECRET) {
   throw new Error("JWT_SECRET is not defined in environment variables");
 }
 
-
-
-
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+const generateToken = (user) => {
+  return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
     expiresIn: "1d",
   });
 };
-
-
-
 
 exports.registerUser = async (req, res) => {
   try {
     const { name, email, password, phone } = req.body;
 
-    
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
@@ -32,7 +23,6 @@ exports.registerUser = async (req, res) => {
       });
     }
 
-    
     const userExists = await User.findOne({ email: email.toLowerCase() });
     if (userExists) {
       return res.status(400).json({
@@ -41,17 +31,17 @@ exports.registerUser = async (req, res) => {
       });
     }
 
-    
     const salt = await bcrypt.genSalt(10);
+    const userCount = await User.countDocuments();
+
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    
     const user = await User.create({
       name,
       email: email.toLowerCase(),
       password: hashedPassword,
       phone,
-      role: "staff", 
+      role: userCount === 0 ? "admin" : "staff",
     });
 
     res.status(201).json({
@@ -63,7 +53,7 @@ exports.registerUser = async (req, res) => {
         email: user.email,
         role: user.role,
       },
-      token: generateToken(user._id),
+      token: generateToken(user),
     });
   } catch (error) {
     res.status(500).json({
@@ -73,14 +63,10 @@ exports.registerUser = async (req, res) => {
   }
 };
 
-
-
-
 exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -88,7 +74,6 @@ exports.loginUser = async (req, res) => {
       });
     }
 
-    
     const user = await User.findOne({ email: email.toLowerCase() }).select(
       "+password",
     );
@@ -100,7 +85,6 @@ exports.loginUser = async (req, res) => {
       });
     }
 
-    
     if (!user.isActive) {
       return res.status(403).json({
         success: false,
@@ -108,7 +92,6 @@ exports.loginUser = async (req, res) => {
       });
     }
 
-    
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
@@ -118,7 +101,6 @@ exports.loginUser = async (req, res) => {
       });
     }
 
-    
     res.status(200).json({
       success: true,
       message: "Login successful",
@@ -128,7 +110,7 @@ exports.loginUser = async (req, res) => {
         email: user.email,
         role: user.role,
       },
-      token: generateToken(user._id),
+      token: generateToken(user),
     });
   } catch (error) {
     res.status(500).json({
@@ -137,9 +119,6 @@ exports.loginUser = async (req, res) => {
     });
   }
 };
-
-
-
 
 exports.logoutUser = async (req, res) => {
   try {
@@ -155,9 +134,6 @@ exports.logoutUser = async (req, res) => {
   }
 };
 
-
-
-
 exports.changePassword = async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
@@ -169,7 +145,6 @@ exports.changePassword = async (req, res) => {
       });
     }
 
-    
     const user = await User.findById(req.user.id).select("+password");
 
     if (!user) {
@@ -179,7 +154,6 @@ exports.changePassword = async (req, res) => {
       });
     }
 
-    
     const isMatch = await bcrypt.compare(oldPassword, user.password);
 
     if (!isMatch) {
@@ -189,7 +163,6 @@ exports.changePassword = async (req, res) => {
       });
     }
 
-    
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(newPassword, salt);
 
