@@ -1,5 +1,6 @@
 require("dotenv").config();
-
+const dns = require("dns");
+dns.setDefaultResultOrder("ipv4first");
 const http = require("http");
 const express = require("express");
 const cors = require("cors");
@@ -19,11 +20,11 @@ const contactRoutes = require("./routes/contactRoutes");
 const insightRoutes = require("./routes/insightRoutes");
 
 const app = express();
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 10000;
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "*",
+    origin: process.env.CLIENT_URL,
     credentials: true,
   }),
 );
