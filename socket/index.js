@@ -6,13 +6,18 @@ const EVENTS = {
   JOIN_CONTACT: "join_contact",
   LEAVE_CONTACT: "leave_contact",
 
-  TYPING: "typing",
-  STOP_TYPING: "stop_typing",
+  TYPING: "contact_typing",
+  STOP_TYPING: "contact_stop_typing",
 
   CONTACT_REPLY_RECEIVE: "contact_reply_receive",
+  CONTACT_DELIVERED: "contact_message_delivered",
+  CONTACT_SEEN: "contact_message_seen",
 
   NEW_CONTACT_MESSAGE: "new_contact_message",
   CONTACT_NOTIFICATION: "contact_notification",
+
+  USER_ONLINE: "contact_user_online",
+  USER_OFFLINE: "contact_user_offline",
 };
 
 exports.initSocket = (server) => {
@@ -25,6 +30,8 @@ exports.initSocket = (server) => {
 
   io.on("connection", (socket) => {
     console.log("⚡ Socket connected:", socket.id);
+
+    socket.broadcast.emit(EVENTS.USER_ONLINE);
 
     socket.on(EVENTS.JOIN_CONTACT, ({ contactId }) => {
       if (!contactId) return;
@@ -53,17 +60,26 @@ exports.initSocket = (server) => {
       });
     });
 
-    socket.on("send_message", ({ conversationId, message, sender }) => {
-      if (!conversationId || !message) return;
+    socket.on("send_message", ({ contactId, message, sender, tempId }) => {
+      if (!contactId || !message) return;
 
       const payload = {
-        conversationId,
+        contactId,
         message,
         sender,
+        tempId,
         createdAt: new Date(),
       };
 
-      io.to(conversationId).emit(EVENTS.CONTACT_REPLY_RECEIVE, payload);
+      socket.to(contactId).emit(EVENTS.CONTACT_REPLY_RECEIVE, payload);
+
+      socket.emit(EVENTS.CONTACT_REPLY_RECEIVE, payload);
+
+      socket.emit(EVENTS.CONTACT_DELIVERED, { tempId });
+    });
+
+    socket.on(EVENTS.CONTACT_SEEN, ({ contactId }) => {
+      socket.to(contactId).emit(EVENTS.CONTACT_SEEN);
     });
 
     socket.on(EVENTS.NEW_CONTACT_MESSAGE, (data) => {
@@ -75,6 +91,8 @@ exports.initSocket = (server) => {
 
     socket.on("disconnect", () => {
       console.log("❌ Disconnected:", socket.id);
+
+      socket.broadcast.emit(EVENTS.USER_OFFLINE);
     });
   });
 };
