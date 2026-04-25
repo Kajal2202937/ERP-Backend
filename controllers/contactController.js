@@ -89,34 +89,33 @@ exports.deleteContact = async (req, res) => {
 };
 exports.replyContact = async (req, res) => {
   try {
-    const { message, tempId } = req.body; 
+    const { message, tempId } = req.body;
 
     const contact = await contactService.addReply(req.params.id, message);
 
     const io = getIO();
 
-    
     const lastReply = contact.replies[contact.replies.length - 1];
 
     const replyPayload = {
-      _id: lastReply._id, 
+      _id: lastReply._id,
       contactId: contact._id,
       message,
       sender: "admin",
-      tempId, 
+      tempId,
       createdAt: lastReply.createdAt,
     };
 
-    console.log("EMITTING:", replyPayload); 
+    console.log("EMITTING:", replyPayload);
 
     io.to(contact._id.toString()).emit("contact_reply_receive", replyPayload);
 
+    io.emit("contact_reply_receive", replyPayload);
     res.json({
       success: true,
       data: contact,
     });
   } catch (err) {
-    
     res.status(400).json({
       success: false,
       message: err.message,

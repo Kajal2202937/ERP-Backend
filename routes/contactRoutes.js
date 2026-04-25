@@ -17,6 +17,6 @@ router.get("/", protect, getContacts);
 router.put("/:id", protect, updateContact);
 router.delete("/:id", protect, deleteContact);
 
-router.post("/:id/reply", protect, replyContact);
+router.post("/:id/reply", replyContact);
 
 module.exports = router;
