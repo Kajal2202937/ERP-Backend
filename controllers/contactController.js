@@ -18,15 +18,17 @@ exports.createContact = async (req, res) => {
 
     io.emit("contact_notification", contact);
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: contact.email,
-      subject: "We received your message",
-      html: `
+    transporter
+      .sendMail({
+        from: process.env.EMAIL_USER,
+        to: contact.email,
+        subject: "We received your message",
+        html: `
         <h3>Hello ${contact.name}</h3>
         <p>Thanks for contacting us. Our team will respond shortly.</p>
       `,
-    });
+      })
+      .catch((err) => console.log("Email error:", err.message));
 
     res.status(201).json({
       success: true,
@@ -91,7 +93,11 @@ exports.replyContact = async (req, res) => {
   try {
     const { message, tempId } = req.body;
 
-    const contact = await contactService.addReply(req.params.id, message);
+    const contact = await contactService.addReply(
+      req.params.id,
+      message,
+      "admin",
+    );
 
     const io = getIO();
 
@@ -99,24 +105,25 @@ exports.replyContact = async (req, res) => {
 
     const replyPayload = {
       _id: lastReply._id,
-      contactId: contact._id,
+      contactId: contact._id.toString(),
       message,
       sender: "admin",
-      tempId,
+      tempId: tempId || null,
       createdAt: lastReply.createdAt,
     };
 
-    console.log("EMITTING:", replyPayload);
-
     io.to(contact._id.toString()).emit("contact_reply_receive", replyPayload);
 
-    io.emit("contact_reply_receive", replyPayload);
-    res.json({
+    io.emit("contact_reply_receive_admin", replyPayload);
+
+    await contactService.updateContactStatus(contact._id, "replied");
+
+    return res.json({
       success: true,
       data: contact,
     });
   } catch (err) {
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
       message: err.message,
     });

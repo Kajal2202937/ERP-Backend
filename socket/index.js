@@ -29,24 +29,28 @@ exports.initSocket = (server) => {
   });
 
   io.on("connection", (socket) => {
-    console.log("⚡ Socket connected:", socket.id);
+    console.log("⚡ Connected:", socket.id);
 
     socket.broadcast.emit(EVENTS.USER_ONLINE);
 
     socket.on(EVENTS.JOIN_CONTACT, ({ contactId }) => {
       if (!contactId) return;
-      socket.join(contactId);
+
+      socket.join(String(contactId));
+
+      console.log(`Socket ${socket.id} joined room ${contactId}`);
     });
 
     socket.on(EVENTS.LEAVE_CONTACT, ({ contactId }) => {
       if (!contactId) return;
-      socket.leave(contactId);
+
+      socket.leave(String(contactId));
     });
 
     socket.on(EVENTS.TYPING, ({ contactId, user }) => {
       if (!contactId) return;
 
-      socket.to(contactId).emit(EVENTS.TYPING, {
+      socket.to(String(contactId)).emit(EVENTS.TYPING, {
         contactId,
         user,
       });
@@ -55,31 +59,17 @@ exports.initSocket = (server) => {
     socket.on(EVENTS.STOP_TYPING, ({ contactId }) => {
       if (!contactId) return;
 
-      socket.to(contactId).emit(EVENTS.STOP_TYPING, {
+      socket.to(String(contactId)).emit(EVENTS.STOP_TYPING, {
         contactId,
       });
     });
 
-    socket.on("send_message", ({ contactId, message, sender, tempId }) => {
-      if (!contactId || !message) return;
-
-      const payload = {
-        contactId,
-        message,
-        sender,
-        tempId,
-        createdAt: new Date(),
-      };
-
-      socket.to(contactId).emit(EVENTS.CONTACT_REPLY_RECEIVE, payload);
-
-      socket.emit(EVENTS.CONTACT_REPLY_RECEIVE, payload);
-
-      socket.emit(EVENTS.CONTACT_DELIVERED, { tempId });
-    });
-
     socket.on(EVENTS.CONTACT_SEEN, ({ contactId }) => {
-      socket.to(contactId).emit(EVENTS.CONTACT_SEEN);
+      if (!contactId) return;
+
+      socket.to(String(contactId)).emit(EVENTS.CONTACT_SEEN, {
+        contactId,
+      });
     });
 
     socket.on(EVENTS.NEW_CONTACT_MESSAGE, (data) => {
