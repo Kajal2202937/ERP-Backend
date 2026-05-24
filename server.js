@@ -44,19 +44,25 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
   : ["http://localhost:5173"];
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
 
-      return callback(new Error(`CORS policy: origin ${origin} not allowed`));
-    },
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
 
-    credentials: true,
-  }),
-);
+    console.warn(`[CORS] Blocked request from origin: ${origin}`);
+    return callback(new Error(`CORS policy: origin ${origin} not allowed`));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+};
+
+app.options("*", cors(corsOptions));
+
+app.use(cors(corsOptions));
 
 if (process.env.NODE_ENV !== "test") {
   app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
@@ -79,80 +85,48 @@ app.use(cookieParser());
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-
   max: 20,
-
   standardHeaders: true,
-
   legacyHeaders: false,
-
-  keyGenerator: (req) => {
-    return ipKeyGenerator(req.ip);
-  },
-
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
   message: {
     success: false,
-
     message: "Too many login attempts. Please try again later.",
   },
 });
 
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-
   max: 300,
-
   standardHeaders: true,
-
   legacyHeaders: false,
-
-  keyGenerator: (req) => {
-    return ipKeyGenerator(req.ip);
-  },
-
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
   message: {
     success: false,
-
     message: "Too many requests. Please try again later.",
   },
 });
 
 const ticketCreateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-
   max: 10,
-
   standardHeaders: true,
-
   legacyHeaders: false,
-
-  keyGenerator: (req) => {
-    return ipKeyGenerator(req.ip);
-  },
-
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
   message: {
     success: false,
-
     message: "Too many support tickets submitted. Please try again later.",
   },
 });
 
 const ticketReplyLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-
   max: 60,
-
   standardHeaders: true,
-
   legacyHeaders: false,
-
-  keyGenerator: (req) => {
-    return ipKeyGenerator(req.ip);
-  },
-
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
   message: {
     success: false,
-
     message: "Too many messages. Please slow down.",
   },
 });
@@ -160,11 +134,8 @@ const ticketReplyLimiter = rateLimit({
 app.get("/", (_req, res) => {
   res.status(200).json({
     success: true,
-
     message: "ERP API Running 🚀",
-
     environment: process.env.NODE_ENV || "development",
-
     timestamp: new Date().toISOString(),
   });
 });
@@ -172,37 +143,24 @@ app.get("/", (_req, res) => {
 app.get("/api/health", (_req, res) => {
   res.status(200).json({
     success: true,
-
     message: "Healthy",
   });
 });
 
 app.use("/api/tickets", ticketReplyLimiter, ticketRoutes);
-
 app.use("/api/auth", authLimiter, authRoutes);
-
 app.use("/api/users", globalLimiter, userRoutes);
-
 app.use("/api/inventory", globalLimiter, inventoryRoutes);
-
 app.use("/api/products", globalLimiter, productRoutes);
-
 app.use("/api/suppliers", globalLimiter, supplierRoutes);
-
 app.use("/api/orders", globalLimiter, orderRoutes);
-
 app.use("/api/production", globalLimiter, productionRoutes);
-
 app.use("/api/reports", globalLimiter, reportRoutes);
-
 app.use("/api/insights", globalLimiter, insightRoutes);
-
 app.use("/api/ai", globalLimiter, aiRoutes);
-
 app.use("/api/pdf", globalLimiter, pdfRoutes);
 
 app.use(notFound);
-
 app.use(errorHandler);
 
 const startServer = async () => {
@@ -215,10 +173,9 @@ const startServer = async () => {
 
     server.listen(PORT, () => {
       console.log(
-        `🚀 Server running in ${
-          process.env.NODE_ENV || "development"
-        } mode on port ${PORT}`,
+        `🚀 Server running in ${process.env.NODE_ENV || "development"} mode on port ${PORT}`,
       );
+      console.log(`🌐 Allowed origins: ${allowedOrigins.join(", ")}`);
     });
 
     const shutdown = (signal) => {
@@ -226,23 +183,19 @@ const startServer = async () => {
 
       server.close(() => {
         console.log("✅ HTTP server closed.");
-
         process.exit(0);
       });
 
       setTimeout(() => {
         console.error("⚠️ Force shutdown after timeout.");
-
         process.exit(1);
       }, 10000);
     };
 
     process.on("SIGTERM", () => shutdown("SIGTERM"));
-
     process.on("SIGINT", () => shutdown("SIGINT"));
   } catch (err) {
     console.error("❌ Failed to start server:", err.message);
-
     process.exit(1);
   }
 };
