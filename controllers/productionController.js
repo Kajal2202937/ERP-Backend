@@ -1,54 +1,39 @@
 const productionService = require("../services/productionService");
-const reportService = require("../services/productionReportService");
+const productionReportService = require("../services/productionReportService");
+const asyncHandler4 = require("../middleware/asyncHandler");
 
-exports.getProductionReport = async (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-    await reportService.generateProductionReport(startDate, endDate, res);
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
+exports.getProductionReport = asyncHandler4(async (req, res) => {
+  const { startDate, endDate } = req.query;
 
-exports.createProduction = async (req, res) => {
-  try {
-    const data = await productionService.createProduction(req.body);
+  const result = await productionReportService.getProductionReportData(
+    startDate,
+    endDate,
+  );
+  res.json({ success: true, ...result });
+});
 
-    res.status(201).json({ success: true, data });
-  } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
-  }
-};
+exports.createProduction = asyncHandler4(async (req, res) => {
+  const data = await productionService.createProduction(req.body);
+  res.status(201).json({ success: true, data });
+});
 
-exports.getProductions = async (req, res) => {
-  try {
-    const data = await productionService.getProductions();
+exports.getProductions = asyncHandler4(async (req, res) => {
+  const data = await productionService.getProductions();
+  res.json({ success: true, data });
+});
 
-    res.json({ success: true, data });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
+exports.updateProduction = asyncHandler4(async (req, res) => {
+  const data = await productionService.updateProduction(
+    req.params.id,
+    req.body,
+  );
+  res.json({ success: true, data });
+});
 
-exports.updateProduction = async (req, res) => {
-  try {
-    const data = await productionService.updateProduction(
-      req.params.id,
-      req.body,
-    );
-
-    res.json({ success: true, data });
-  } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
-  }
-};
-
-exports.deleteProduction = async (req, res) => {
-  try {
-    await productionService.deleteProduction(req.params.id);
-
-    res.json({ success: true, message: "Deleted successfully" });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
+exports.deleteProduction = asyncHandler4(async (req, res) => {
+  await productionService.deleteProduction(req.params.id);
+  res.json({
+    success: true,
+    message: "Production record deleted successfully",
+  });
+});

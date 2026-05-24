@@ -1,4 +1,4 @@
-const { getIO } = require("../socket");
+const { getIO } = require("../socket/index");
 const Notification = require("../models/Notification");
 
 const notifyUser = async (userId, payload) => {

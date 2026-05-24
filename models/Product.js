@@ -39,12 +39,24 @@ const productSchema = new mongoose.Schema(
       min: 0,
     },
 
+    quantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    status: {
+      type: String,
+      enum: ["active", "inactive"],
+      default: "active",
+    },
+
     supplier: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Supplier",
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("Product", productSchema);

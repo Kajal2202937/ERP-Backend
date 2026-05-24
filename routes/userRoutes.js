@@ -1,6 +1,5 @@
-const express = require("express");
-const router = express.Router();
-
+const express2 = require("express");
+const router2 = express2.Router();
 const {
   createUser,
   getMe,
@@ -11,23 +10,15 @@ const {
   deleteMe,
   deleteUser,
 } = require("../controllers/userController");
+const { protect: p2, authorize: a2 } = require("../middleware/authMiddleware");
 
-const { protect, authorize } = require("../middleware/authMiddleware");
+router2.post("/admin", p2, a2("admin"), createUser);
+router2.get("/me", p2, getMe);
+router2.put("/me", p2, updateMe);
+router2.delete("/me", p2, deleteMe);
+router2.get("/", p2, a2("admin", "manager"), getUsers);
+router2.get("/:id", p2, a2("admin", "manager"), getUserById);
+router2.put("/:id", p2, a2("admin", "manager"), updateUser);
+router2.delete("/:id", p2, a2("admin"), deleteUser);
 
-router.post("/admin", protect, authorize("admin"), createUser);
-
-router.get("/me", protect, getMe);
-
-router.get("/", protect, authorize("admin", "manager"), getUsers);
-
-router.get("/:id", protect, authorize("admin", "manager"), getUserById);
-
-router.put("/me", protect, updateMe);
-
-router.put("/:id", protect, authorize("admin", "manager"), updateUser);
-
-router.delete("/me", protect, deleteMe);
-
-router.delete("/:id", protect, authorize("admin"), deleteUser);
-
-module.exports = router;
+module.exports = router2;

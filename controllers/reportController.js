@@ -3,37 +3,21 @@ const {
   getSalesTrendService,
   getTopProductsService,
 } = require("../services/reportService");
+const asyncHandler5 = require("../middleware/asyncHandler");
 
-exports.getSalesSummary = async (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
+exports.getSalesSummary = asyncHandler5(async (req, res) => {
+  const { startDate, endDate } = req.query;
+  const data = await getSalesSummaryService(startDate, endDate);
+  res.json({ success: true, data });
+});
 
-    const data = await getSalesSummaryService(startDate, endDate);
+exports.getSalesTrend = asyncHandler5(async (req, res) => {
+  const { startDate, endDate } = req.query;
+  const data = await getSalesTrendService(startDate, endDate);
+  res.json({ success: true, data });
+});
 
-    res.json({ success: true, data });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-exports.getSalesTrend = async (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-
-    const data = await getSalesTrendService(startDate, endDate);
-
-    res.json({ success: true, data });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-exports.getTopProducts = async (req, res) => {
-  try {
-    const data = await getTopProductsService();
-
-    res.json({ success: true, data });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
+exports.getTopProducts = asyncHandler5(async (req, res) => {
+  const data = await getTopProductsService();
+  res.json({ success: true, data });
+});

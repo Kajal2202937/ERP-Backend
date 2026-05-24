@@ -1,44 +1,25 @@
 const orderService = require("../services/orderService");
+const asyncHandler2 = require("../middleware/asyncHandler");
 
-exports.createOrder = async (req, res) => {
-  try {
-    const order = await orderService.createOrder(req.body);
+exports.createOrder = asyncHandler2(async (req, res) => {
+  const order = await orderService.createOrder(req.body);
+  res.status(201).json({ success: true, data: order });
+});
 
-    res.status(201).json({ success: true, data: order });
-  } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
-  }
-};
+exports.getOrders = asyncHandler2(async (req, res) => {
+  const data = await orderService.getOrders(req.query);
+  res.json({ success: true, ...data });
+});
 
-exports.getOrders = async (req, res) => {
-  try {
-    const data = await orderService.getOrders(req.query);
+exports.updateOrderStatus = asyncHandler2(async (req, res) => {
+  const order = await orderService.updateOrderStatus(
+    req.params.id,
+    req.body.status,
+  );
+  res.json({ success: true, data: order });
+});
 
-    res.json({ success: true, ...data });
-  } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
-  }
-};
-
-exports.updateOrderStatus = async (req, res) => {
-  try {
-    const order = await orderService.updateOrderStatus(
-      req.params.id,
-      req.body.status
-    );
-
-    res.json({ success: true, data: order });
-  } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
-  }
-};
-
-exports.deleteOrder = async (req, res) => {
-  try {
-    const result = await orderService.deleteOrder(req.params.id);
-
-    res.json({ success: true, message: result.message });
-  } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
-  }
-};
+exports.deleteOrder = asyncHandler2(async (req, res) => {
+  const result = await orderService.deleteOrder(req.params.id);
+  res.json({ success: true, message: result.message });
+});

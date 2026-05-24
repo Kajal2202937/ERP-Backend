@@ -1,158 +1,112 @@
-const User = require("../models/User");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const User = require("../models/User");
+const asyncHandler = require("../middleware/asyncHandler");
+const AppError = require("../utils/AppError");
 
-exports.createUser = async (req, res) => {
-  try {
-    const { name, email, password, role, phone } = req.body;
+const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+exports.createUser = asyncHandler(async (req, res) => {
+  const { name, email, password, role, phone } = req.body;
 
-    const user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      role: role || "staff",
-      phone,
-    });
-
-    res.status(201).json({
-      success: true,
-      data: user,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  if (!name || !email || !password) {
+    throw new AppError("Name, email and password are required", 400);
   }
-};
 
-exports.getMe = async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id);
-
-    res.json({
-      success: true,
-      data: user,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  if (password.length < 6) {
+    throw new AppError("Password must be at least 6 characters", 400);
   }
-};
 
-exports.getUsers = async (req, res) => {
-  try {
-    const users = await User.find();
+  const user = await User.create({
+    name,
+    email: email.toLowerCase(),
+    password: await bcrypt.hash(password, 10),
+    role: role || "staff",
+    phone,
+  });
 
-    res.json({
-      success: true,
-      count: users.length,
-      data: users,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  res.status(201).json({
+    success: true,
+    data: {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
+  });
+});
+
+exports.getMe = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user.id);
+  if (!user) throw new AppError("User not found", 404);
+  res.json({ success: true, data: user });
+});
+
+exports.getUsers = asyncHandler(async (req, res) => {
+  const users = await User.find().select("-password");
+  res.json({ success: true, count: users.length, data: users });
+});
+
+exports.getUserById = asyncHandler(async (req, res) => {
+  if (!isValidId(req.params.id)) throw new AppError("Invalid user ID", 400);
+
+  const user = await User.findById(req.params.id).select("-password");
+  if (!user) throw new AppError("User not found", 404);
+
+  res.json({ success: true, data: user });
+});
+
+exports.updateMe = asyncHandler(async (req, res) => {
+  const { role, password, isActive, ...updateData } = req.body;
+
+  const user = await User.findByIdAndUpdate(req.user.id, updateData, {
+    new: true,
+    runValidators: true,
+  }).select("-password");
+
+  if (!user) throw new AppError("User not found", 404);
+
+  res.json({ success: true, data: user });
+});
+
+exports.updateUser = asyncHandler(async (req, res) => {
+  if (!isValidId(req.params.id)) throw new AppError("Invalid user ID", 400);
+
+  const updateData = { ...req.body };
+
+  if (req.user.role !== "admin") delete updateData.role;
+
+  if (updateData.password) {
+    if (updateData.password.length < 6) {
+      throw new AppError("Password must be at least 6 characters", 400);
+    }
+    updateData.password = await bcrypt.hash(updateData.password, 10);
   }
-};
 
-exports.getUserById = async (req, res) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid user ID" });
-    }
+  const user = await User.findByIdAndUpdate(req.params.id, updateData, {
+    new: true,
+    runValidators: true,
+  }).select("-password");
 
-    const user = await User.findById(req.params.id);
+  if (!user) throw new AppError("User not found", 404);
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+  res.json({ success: true, data: user });
+});
 
-    res.json({
-      success: true,
-      data: user,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+exports.deleteMe = asyncHandler(async (req, res) => {
+  await User.findByIdAndDelete(req.user.id);
+  res.json({ success: true, message: "Account deleted successfully" });
+});
+
+exports.deleteUser = asyncHandler(async (req, res) => {
+  if (!isValidId(req.params.id)) throw new AppError("Invalid user ID", 400);
+
+  if (req.user.id === req.params.id) {
+    throw new AppError("Admin cannot delete their own account", 400);
   }
-};
 
-exports.updateMe = async (req, res) => {
-  try {
-    delete req.body.role;
+  const user = await User.findByIdAndDelete(req.params.id);
+  if (!user) throw new AppError("User not found", 404);
 
-    if (req.body.password) {
-      req.body.password = await bcrypt.hash(req.body.password, 10);
-    }
-
-    const user = await User.findByIdAndUpdate(req.user.id, req.body, {
-      new: true,
-    });
-
-    res.json({
-      success: true,
-      data: user,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-exports.updateUser = async (req, res) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid user ID" });
-    }
-
-    if (req.user.role !== "admin") {
-      delete req.body.role;
-    }
-
-    if (req.body.password) {
-      req.body.password = await bcrypt.hash(req.body.password, 10);
-    }
-
-    const user = await User.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
-
-    res.json({
-      success: true,
-      data: user,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-exports.deleteMe = async (req, res) => {
-  try {
-    await User.findByIdAndDelete(req.user.id);
-
-    res.json({
-      success: true,
-      message: "User deleted",
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-exports.deleteUser = async (req, res) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid user ID" });
-    }
-
-    if (req.user.id === req.params.id) {
-      return res.status(400).json({
-        message: "Admin cannot delete own account",
-      });
-    }
-
-    await User.findByIdAndDelete(req.params.id);
-
-    res.json({
-      success: true,
-      message: "User deleted by admin",
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+  res.json({ success: true, message: "User deleted successfully" });
+});

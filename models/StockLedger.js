@@ -20,14 +20,22 @@ const stockLedgerSchema = new mongoose.Schema(
       min: 1,
     },
 
+    
     source: {
       type: String,
-      enum: ["ORDER", "PRODUCTION", "MANUAL", "ADJUSTMENT"],
+      enum: [
+        "ORDER",
+        "ORDER_CANCEL",
+        "ORDER_DELETE",
+        "PRODUCTION",
+        "MANUAL",
+        "ADJUSTMENT",
+      ],
       required: true,
     },
 
     referenceId: {
-      type: mongoose.Schema.Types.ObjectId, 
+      type: mongoose.Schema.Types.ObjectId,
       default: null,
     },
 
@@ -36,12 +44,22 @@ const stockLedgerSchema = new mongoose.Schema(
       default: 0,
     },
 
-    createdAt: {
-      type: Date,
-      default: Date.now,
+    
+    before: {
+      type: Number,
+      default: 0,
+    },
+
+    after: {
+      type: Number,
+      default: 0,
     },
   },
+  
   { timestamps: true }
 );
+
+
+stockLedgerSchema.index({ product: 1, createdAt: -1 });
 
 module.exports = mongoose.model("StockLedger", stockLedgerSchema);
