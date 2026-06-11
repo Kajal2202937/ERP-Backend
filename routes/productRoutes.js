@@ -1,14 +1,20 @@
-const express6 = require("express");
-const router6 = express6.Router();
+const express = require("express");
+const router = express.Router();
 const pc = require("../controllers/productController");
-const { protect: p6, authorize: a6 } = require("../middleware/authMiddleware");
+const { protect: p, authorize: a } = require("../middleware/authMiddleware");
+const { validate } = require("../middleware/validate");
+const {
+  createProductSchema,
+  updateProductSchema,
+  productQuerySchema,
+} = require("../validation/productSchemas");
 
-router6.get("/low-stock", p6, pc.getLowStockProducts);
+router.get("/low-stock", p, pc.getLowStockProducts);
 
-router6.post("/", p6, pc.createProduct);
-router6.get("/", p6, pc.getProducts);
-router6.get("/:id", p6, pc.getProduct);
-router6.put("/:id", p6, pc.updateProduct);
-router6.delete("/:id", p6, a6("admin"), pc.deleteProduct);
+router.post("/", p, validate(createProductSchema), pc.createProduct);
+router.get("/", p, validate(productQuerySchema, "query"), pc.getProducts);
+router.get("/:id", p, pc.getProduct);
+router.put("/:id", p, validate(updateProductSchema), pc.updateProduct);
+router.delete("/:id", p, a("admin"), pc.deleteProduct);
 
-module.exports = router6;
+module.exports = router;

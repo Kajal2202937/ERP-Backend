@@ -1,4 +1,5 @@
 const StockLedger = require("../models/StockLedger");
+const AppError = require("../utils/AppError");
 
 exports.addStockEntry = async ({
   product,
@@ -9,7 +10,7 @@ exports.addStockEntry = async ({
   costPrice = 0,
 }) => {
   if (!product || !type || !quantity || !source) {
-    throw new Error("Missing stock ledger data");
+    throw new AppError("Missing stock ledger data");
   }
 
   return await StockLedger.create({

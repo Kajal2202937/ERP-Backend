@@ -5,32 +5,38 @@ const stockLedgerSchema = new mongoose.Schema(
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
-      required: true,
+      required: [true, "Product is required"],
     },
 
     type: {
       type: String,
-      enum: ["IN", "OUT"],
+      enum: {
+        values: ["IN", "OUT"],
+        message: "Type must be IN or OUT",
+      },
       required: true,
     },
 
     quantity: {
       type: Number,
       required: true,
-      min: 1,
+      min: [1, "Quantity must be at least 1"],
     },
 
-    
     source: {
       type: String,
-      enum: [
-        "ORDER",
-        "ORDER_CANCEL",
-        "ORDER_DELETE",
-        "PRODUCTION",
-        "MANUAL",
-        "ADJUSTMENT",
-      ],
+      enum: {
+        values: [
+          "ORDER",
+          "ORDER_CANCEL",
+          "ORDER_DELETE",
+          "PRODUCTION",
+          "PRODUCTION_DELETE",
+          "MANUAL",
+          "ADJUSTMENT",
+        ],
+        message: "Invalid stock movement source",
+      },
       required: true,
     },
 
@@ -44,7 +50,6 @@ const stockLedgerSchema = new mongoose.Schema(
       default: 0,
     },
 
-    
     before: {
       type: Number,
       default: 0,
@@ -55,11 +60,17 @@ const stockLedgerSchema = new mongoose.Schema(
       default: 0,
     },
   },
-  
-  { timestamps: true }
+  { timestamps: true, versionKey: false },
 );
 
-
 stockLedgerSchema.index({ product: 1, createdAt: -1 });
+
+stockLedgerSchema.index({ type: 1, createdAt: -1 });
+
+stockLedgerSchema.index({ source: 1, createdAt: -1 });
+
+stockLedgerSchema.index({ product: 1, type: 1, createdAt: -1 });
+
+stockLedgerSchema.index({ referenceId: 1 });
 
 module.exports = mongoose.model("StockLedger", stockLedgerSchema);

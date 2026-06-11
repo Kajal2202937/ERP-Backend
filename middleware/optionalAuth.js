@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 
-const optionalAuth = (req, _res, next) => {
+const optionalAuth = async (req, _res, next) => {
   try {
     const authHeader = req.headers.authorization;
     const token =
@@ -13,8 +14,35 @@ const optionalAuth = (req, _res, next) => {
       return next();
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+      req.user = null;
+      return next();
+    }
+
+    const user = await User.findById(decoded.id).select(
+      "-password +tokenVersion",
+    );
+
+    if (!user) {
+      req.user = null;
+      return next();
+    }
+
+    if (decoded.tv !== user.tokenVersion) {
+      req.user = null;
+      return next();
+    }
+
+    if (!user.isActive) {
+      req.user = null;
+      return next();
+    }
+
+    user.tokenVersion = undefined;
+    req.user = user;
   } catch {
     req.user = null;
   }

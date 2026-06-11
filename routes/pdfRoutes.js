@@ -1,62 +1,68 @@
-const express2 = require("express");
-const router2 = express2.Router();
+const express = require("express");
+const router = express.Router();
 
 const pdf = require("../controllers/pdfController");
 const xlsx = require("../controllers/xlsxController");
 
-const { protect: p2, authorize: a2 } = require("../middleware/authMiddleware");
+const { protect, authorize } = require("../middleware/authMiddleware");
+const {
+  upload,
+  validateBufferMiddleware,
+} = require("../middleware/xlsxUpload");
 
-const upload = require("../middleware/xlsxUpload");
-
-router2.get("/invoice/:id", p2, pdf.downloadInvoice);
-
-router2.get(
+router.get("/invoice/:id", protect, pdf.downloadInvoice);
+router.get(
   "/suppliers",
-  p2,
-  a2("admin", "manager"),
+  protect,
+  authorize("admin", "manager"),
   pdf.downloadSupplierReport,
 );
+router.get("/sales", protect, authorize("admin"), pdf.downloadSalesReport);
 
-router2.get("/sales", p2, a2("admin"), pdf.downloadSalesReport);
+router.get("/xlsx/suppliers", protect, xlsx.exportSuppliersXlsx);
+router.get("/xlsx/inventory", protect, xlsx.exportInventoryXlsx);
+router.get("/xlsx/products", protect, xlsx.exportProductsXlsx);
+router.get(
+  "/xlsx/orders",
+  protect,
+  authorize("admin", "manager"),
+  xlsx.exportOrdersXlsx,
+);
 
-router2.get("/xlsx/suppliers", p2, xlsx.exportSuppliersXlsx);
-
-router2.get("/xlsx/inventory", p2, xlsx.exportInventoryXlsx);
-
-router2.get("/xlsx/products", p2, xlsx.exportProductsXlsx);
-
-router2.get("/xlsx/orders", p2, a2("admin", "manager"), xlsx.exportOrdersXlsx);
-
-router2.post(
+router.post(
   "/xlsx/import/products",
-  p2,
-  a2("admin"),
+  protect,
+  authorize("admin"),
   upload.single("file"),
+  validateBufferMiddleware,
   xlsx.importProductsXlsx,
 );
 
-router2.post(
+router.post(
   "/xlsx/import/suppliers",
-  p2,
-  a2("admin"),
+  protect,
+  authorize("admin"),
   upload.single("file"),
+  validateBufferMiddleware,
   xlsx.importSuppliersXlsx,
 );
 
-router2.post(
+router.post(
   "/xlsx/import/inventory",
-  p2,
-  a2("admin"),
+  protect,
+  authorize("admin"),
   upload.single("file"),
+  validateBufferMiddleware,
   xlsx.importInventoryXlsx,
 );
 
-router2.post(
+router.post(
   "/xlsx/import/orders",
-  p2,
-  a2("admin", "manager"),
+  protect,
+  authorize("admin", "manager"),
   upload.single("file"),
+  validateBufferMiddleware,
   xlsx.importOrdersXlsx,
 );
 
-module.exports = router2;
+module.exports = router;

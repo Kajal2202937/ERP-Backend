@@ -15,12 +15,13 @@ const {
   CONTENT_W,
 } = require("./index");
 
+const fmt = (num) => `Rs. ${Number(num).toLocaleString("en-IN")}`;
+
 exports.generateInvoicePdf = (order, res) => {
   const invoiceNo = order._id.toString().slice(-8).toUpperCase();
   const doc = createDoc(res, `Invoice-${invoiceNo}`);
 
   pageHeader(doc, "TAX INVOICE", `Invoice #${invoiceNo}`);
-
   sectionTitle(doc, "Billing Information");
 
   const infoY = doc.y;
@@ -31,33 +32,49 @@ exports.generateInvoicePdf = (order, res) => {
     .font("Helvetica-Bold")
     .fontSize(7.5)
     .text("BILLED TO", MARGIN, infoY, { characterSpacing: 0.6 });
-
   doc
     .fillColor(BRAND.dark)
     .font("Helvetica-Bold")
     .fontSize(13)
     .text(order.product?.supplier?.name || "N/A", MARGIN, infoY + 14);
-
   doc
     .fillColor(BRAND.text)
     .font("Helvetica")
     .fontSize(9)
-    .text(order.product?.supplier?.email || "—", MARGIN, infoY + 32)
-    .text(order.product?.supplier?.phone || "—", MARGIN, infoY + 46);
+    .text(order.product?.supplier?.email || "-", MARGIN, infoY + 32)
+    .text(order.product?.supplier?.phone || "-", MARGIN, infoY + 46);
+
+  const hasCustomer = order.customer?.name || order.customer?.email;
+  if (hasCustomer) {
+    doc
+      .fillColor(BRAND.muted)
+      .font("Helvetica-Bold")
+      .fontSize(7.5)
+      .text("CUSTOMER", MARGIN, infoY + 66, { characterSpacing: 0.6 });
+    doc
+      .fillColor(BRAND.dark)
+      .font("Helvetica")
+      .fontSize(9)
+      .text(order.customer?.name || "-", MARGIN, infoY + 80)
+      .text(order.customer?.email || "-", MARGIN, infoY + 94)
+      .text(order.customer?.phone || "-", MARGIN, infoY + 108);
+  }
 
   const metaData = [
     ["Invoice Date", new Date(order.createdAt).toLocaleDateString("en-IN")],
     ["Invoice No.", `#${invoiceNo}`],
+    ["Order No.", order.orderNumber || invoiceNo],
     ["Status", order.status],
     ["Due Date", new Date(Date.now() + 15 * 864e5).toLocaleDateString("en-IN")],
   ];
 
+  const metaBoxH = metaData.length * 17 + 12;
   doc
     .roundedRect(
       colMid - 10,
       infoY - 6,
       CONTENT_W - (colMid - MARGIN) + 10,
-      76,
+      metaBoxH,
       8,
     )
     .fill(BRAND.light);
@@ -68,20 +85,18 @@ exports.generateInvoicePdf = (order, res) => {
       colMid - 10,
       infoY - 6,
       CONTENT_W - (colMid - MARGIN) + 10,
-      76,
+      metaBoxH,
       8,
     )
     .stroke();
 
   let metaY = infoY + 2;
-
   metaData.forEach(([label, value]) => {
     doc
       .fillColor(BRAND.muted)
       .font("Helvetica")
       .fontSize(8)
       .text(label, colMid, metaY, { width: 90 });
-
     if (label === "Status") {
       drawBadge(doc, value, colMid + 100, 80, metaY - 2, 18);
     } else {
@@ -91,27 +106,28 @@ exports.generateInvoicePdf = (order, res) => {
         .fontSize(8.5)
         .text(value, colMid + 100, metaY, { width: 90, align: "left" });
     }
-
     metaY += 17;
   });
 
-  doc.y = infoY + 86;
-
+  doc.y = infoY + metaBoxH + 10;
   hr(doc, doc.y, BRAND.border);
   doc.moveDown(1.4);
 
   sectionTitle(doc, "Invoice Items");
 
+  const unitCost = order.costPrice;
+  const totalCost = order.costPrice * order.quantity;
+
   table(
     doc,
-    ["Product", "Qty", "Unit Price", "Cost Price", "Total"],
+    ["Product", "Qty", "Unit Price", "Unit Cost", "Total"],
     [
       [
         order.product?.name || "Product",
         order.quantity,
-        `₹${order.price.toLocaleString("en-IN")}`,
-        `₹${order.costPrice.toLocaleString("en-IN")}`,
-        `₹${order.totalPrice.toLocaleString("en-IN")}`,
+        fmt(order.price),
+        fmt(unitCost),
+        fmt(order.totalPrice),
       ],
     ],
     [195, 55, 85, 85, 75],
@@ -119,56 +135,49 @@ exports.generateInvoicePdf = (order, res) => {
 
   doc.moveDown(0.8);
 
-  const profit = order.totalPrice - order.costPrice * order.quantity;
-  const profitPct =
-    order.totalPrice > 0
-      ? ((profit / order.totalPrice) * 100).toFixed(1)
-      : "0.0";
+  const revenue = order.totalPrice;
+  const profit = revenue - totalCost;
+  const profitPct = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : "0.0";
+  const isLoss = profit < 0;
 
   const TOTALS_X = 318;
   const TOTALS_W = PAGE_W - MARGIN - TOTALS_X;
 
   const totals = [
+    { label: "Revenue (Total)", value: fmt(revenue), highlight: false },
+    { label: "Total Cost", value: fmt(totalCost), highlight: false },
     {
-      label: "Subtotal",
-      value: `₹${order.totalPrice.toLocaleString("en-IN")}`,
+      label: isLoss ? "Net Loss" : "Gross Profit",
+
+      value: `${isLoss ? "-" : "+"}${fmt(Math.abs(profit))}`,
       highlight: false,
+      isLoss,
     },
     {
-      label: "Total Cost",
-      value: `₹${(order.costPrice * order.quantity).toLocaleString("en-IN")}`,
-      highlight: false,
+      label: "Margin",
+      value: `${profitPct}%`,
+      highlight: true,
+      isLoss,
     },
-    {
-      label: "Gross Profit",
-      value: `₹${profit.toLocaleString("en-IN")}`,
-      highlight: false,
-    },
-    { label: "Margin", value: `${profitPct}%`, highlight: true },
   ];
 
   let ty = doc.y;
-
-  totals.forEach(({ label, value, highlight }) => {
+  totals.forEach(({ label, value, highlight, isLoss: loss }) => {
     if (highlight) {
+      const pillColor = loss ? BRAND.danger : BRAND.primary;
       doc
         .roundedRect(TOTALS_X - 10, ty - 2, TOTALS_W + 10, 28, 8)
-        .fill(BRAND.primary);
-
+        .fill(pillColor);
       doc
         .fillColor(BRAND.white)
         .font("Helvetica-Bold")
         .fontSize(9.5)
         .text(label, TOTALS_X, ty + 5, { width: TOTALS_W * 0.48 });
-
       doc
         .fillColor(BRAND.white)
         .font("Helvetica-Bold")
         .fontSize(9.5)
-        .text(value, TOTALS_X, ty + 5, {
-          width: TOTALS_W - 4,
-          align: "right",
-        });
+        .text(value, TOTALS_X, ty + 5, { width: TOTALS_W - 4, align: "right" });
     } else {
       doc
         .fillColor(BRAND.muted)
@@ -176,15 +185,18 @@ exports.generateInvoicePdf = (order, res) => {
         .fontSize(8.5)
         .text(label, TOTALS_X, ty + 5, { width: TOTALS_W * 0.48 });
 
+      const valueColor =
+        label.includes("Profit") || label.includes("Loss")
+          ? loss
+            ? BRAND.danger
+            : BRAND.success
+          : BRAND.dark;
+
       doc
-        .fillColor(BRAND.dark)
+        .fillColor(valueColor)
         .font("Helvetica-Bold")
         .fontSize(8.5)
-        .text(value, TOTALS_X, ty + 5, {
-          width: TOTALS_W - 4,
-          align: "right",
-        });
-
+        .text(value, TOTALS_X, ty + 5, { width: TOTALS_W - 4, align: "right" });
       doc
         .strokeColor(BRAND.border)
         .lineWidth(0.5)
@@ -192,7 +204,6 @@ exports.generateInvoicePdf = (order, res) => {
         .lineTo(TOTALS_X + TOTALS_W, ty + 25)
         .stroke();
     }
-
     ty += 28;
   });
 

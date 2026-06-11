@@ -1,5 +1,6 @@
-const express9 = require("express");
-const router9 = express9.Router();
+const express = require("express");
+const router = express.Router();
+
 const {
   createSupplier,
   getSuppliers,
@@ -9,14 +10,88 @@ const {
   toggleSupplierStatus,
   getSupplierAnalytics,
 } = require("../controllers/supplierController");
-const { protect: p9, authorize: a9 } = require("../middleware/authMiddleware");
 
-router9.get("/analytics", p9, getSupplierAnalytics);
-router9.post("/bulk-delete", p9, a9("admin"), bulkDeleteSuppliers);
-router9.post("/", p9, createSupplier);
-router9.get("/", p9, getSuppliers);
-router9.put("/:id", p9, updateSupplier);
-router9.delete("/:id", p9, a9("admin"), deleteSupplier);
-router9.patch("/:id/toggle-status", p9, a9("admin"), toggleSupplierStatus);
+const { protect, authorize } = require("../middleware/authMiddleware");
+const { validate, validateQuery } = require("../middleware/validate");
+const { auditMiddleware } = require("../middleware/auditLog");
 
-module.exports = router9;
+const {
+  createSupplierSchema,
+  updateSupplierSchema,
+  supplierQuerySchema,
+  bulkDeleteSchema,
+} = require("../validation/supplierSchemas");
+
+router.get("/", protect, validateQuery(supplierQuerySchema), getSuppliers);
+
+router.get(
+  "/analytics",
+  protect,
+  authorize("admin", "manager"),
+  getSupplierAnalytics,
+);
+
+router.post(
+  "/",
+  protect,
+  authorize("admin", "manager"),
+  validate(createSupplierSchema),
+  auditMiddleware(
+    "CREATE",
+    "Supplier",
+    (req) => `Supplier created: ${req.body.name}`,
+  ),
+  createSupplier,
+);
+
+router.post(
+  "/bulk-delete",
+  protect,
+  authorize("admin"),
+  validate(bulkDeleteSchema),
+  auditMiddleware(
+    "DELETE",
+    "Supplier",
+    (req) => `Bulk delete: ${req.body.ids.length} suppliers`,
+  ),
+  bulkDeleteSuppliers,
+);
+
+router.put(
+  "/:id",
+  protect,
+  authorize("admin", "manager"),
+  validate(updateSupplierSchema),
+  auditMiddleware(
+    "UPDATE",
+    "Supplier",
+    (req) => `Supplier ${req.params.id} updated`,
+  ),
+  updateSupplier,
+);
+
+router.patch(
+  "/:id/toggle-status",
+  protect,
+  authorize("admin", "manager"),
+  auditMiddleware(
+    "STATUS_CHANGE",
+    "Supplier",
+    (req) => `Supplier ${req.params.id} status toggled`,
+  ),
+  toggleSupplierStatus,
+);
+
+router.delete(
+  "/:id",
+  protect,
+  authorize("admin"),
+  auditMiddleware(
+    "DELETE",
+    "Supplier",
+    (req) => `Supplier ${req.params.id} deleted`,
+  ),
+  deleteSupplier,
+);
+
+module.exports = router;

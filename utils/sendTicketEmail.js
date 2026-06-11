@@ -21,19 +21,18 @@ const getTransporter = async () => {
     _transporter = transport;
   } catch (err) {
     console.error("❌ Email server connection failed:", err.message);
-
     _transporter = transport;
   }
 
   return _transporter;
 };
 
-const sendEmail = async ({ to, subject, html }) => {
+const sendEmail = async ({ to, subject, html, attachments = [] }) => {
   try {
     const mail = await getTransporter();
     const info = await mail.sendMail({
       from:
-        process.env.EMAIL_FROM || `"ERP Support" <${process.env.EMAIL_USER}>`,
+        process.env.EMAIL_FROM || `"ERP System" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       html,
@@ -41,6 +40,7 @@ const sendEmail = async ({ to, subject, html }) => {
         .replace(/<[^>]*>/g, "")
         .replace(/\s+/g, " ")
         .trim(),
+      attachments,
     });
     console.log(`✅ Email sent to ${to} | ID: ${info.messageId}`);
     return info;
@@ -69,9 +69,6 @@ const emailWrapper = (content) => `
 const ticketBadge = (ticketId) =>
   `<span style="display:inline-block;background:#EEF2FF;color:#4F46E5;padding:4px 10px;border-radius:4px;font-size:13px;font-weight:600;font-family:monospace">${ticketId}</span>`;
 
-/**
- * Sent to user immediately after submitting a support ticket.
- */
 const sendTicketCreatedEmail = async (ticket) => {
   const html = emailWrapper(`
     <h2 style="color:#111827;margin:0 0 8px">We received your request</h2>
@@ -79,7 +76,6 @@ const sendTicketCreatedEmail = async (ticket) => {
       Hi <strong>${ticket.name}</strong>, your support ticket has been created successfully.
       Our team will review it and respond as soon as possible.
     </p>
-
     <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:20px;margin-bottom:24px">
       <table style="width:100%;border-collapse:collapse">
         <tr>
@@ -100,13 +96,10 @@ const sendTicketCreatedEmail = async (ticket) => {
         </tr>
       </table>
     </div>
-
     <p style="color:#6b7280;font-size:14px">
-      You can reply to this ticket at any time using your ticket ID.
-      Keep it safe for future reference.
+      You can reply to this ticket at any time using your ticket ID. Keep it safe for future reference.
     </p>
   `);
-
   return sendEmail({
     to: ticket.email,
     subject: `Support Ticket Created: ${ticket.ticketId}`,
@@ -114,9 +107,6 @@ const sendTicketCreatedEmail = async (ticket) => {
   });
 };
 
-/**
- * Sent to user when an admin posts a reply.
- */
 const sendAdminReplyEmail = async (ticket, replyMessage) => {
   const html = emailWrapper(`
     <h2 style="color:#111827;margin:0 0 8px">You have a new reply</h2>
@@ -124,17 +114,14 @@ const sendAdminReplyEmail = async (ticket, replyMessage) => {
       Hi <strong>${ticket.name}</strong>, our support team has responded to your ticket
       ${ticketBadge(ticket.ticketId)}.
     </p>
-
     <div style="border-left:4px solid #4F46E5;padding:16px 20px;background:#f9fafb;border-radius:0 6px 6px 0;margin-bottom:24px">
       <p style="color:#374151;margin:0;font-size:15px;line-height:1.6">${replyMessage}</p>
     </div>
-
     <p style="color:#6b7280;font-size:14px">
       To continue the conversation, visit the support portal and reference your ticket ID:
       ${ticketBadge(ticket.ticketId)}
     </p>
   `);
-
   return sendEmail({
     to: ticket.email,
     subject: `Re: ${ticket.subject || "Your Support Request"} [${ticket.ticketId}]`,
@@ -142,9 +129,6 @@ const sendAdminReplyEmail = async (ticket, replyMessage) => {
   });
 };
 
-/**
- * Sent to user when admin marks ticket as resolved.
- */
 const sendTicketResolvedEmail = async (ticket) => {
   const html = emailWrapper(`
     <h2 style="color:#111827;margin:0 0 8px">Your ticket has been resolved</h2>
@@ -152,7 +136,6 @@ const sendTicketResolvedEmail = async (ticket) => {
       Hi <strong>${ticket.name}</strong>, we're happy to let you know that your support
       ticket has been marked as resolved.
     </p>
-
     <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:20px;margin-bottom:24px">
       <table style="width:100%;border-collapse:collapse">
         <tr>
@@ -171,13 +154,11 @@ const sendTicketResolvedEmail = async (ticket) => {
         </tr>
       </table>
     </div>
-
     <p style="color:#6b7280;font-size:14px">
       If you feel your issue was not fully resolved or you have further questions,
       please submit a new ticket or reply to reopen this one.
     </p>
   `);
-
   return sendEmail({
     to: ticket.email,
     subject: `Ticket Resolved: ${ticket.ticketId}`,

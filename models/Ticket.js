@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 
-
 const messageSchema = new mongoose.Schema(
   {
     message: {
@@ -21,7 +20,6 @@ const messageSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
-
 
 const ticketSchema = new mongoose.Schema(
   {
@@ -56,7 +54,14 @@ const ticketSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["new", "open", "in_progress", "waiting_for_user", "resolved", "closed"],
+      enum: [
+        "new",
+        "open",
+        "in_progress",
+        "waiting_for_user",
+        "resolved",
+        "closed",
+      ],
       default: "new",
       index: true,
     },
@@ -94,26 +99,25 @@ const ticketSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    versionKey: false,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   },
 );
 
-
 ticketSchema.index({ status: 1, createdAt: -1 });
 ticketSchema.index({ email: 1, createdAt: -1 });
 ticketSchema.index({ lastMessageAt: -1 });
-
 
 ticketSchema.virtual("unreadCount").get(function () {
   return this.messages.filter((m) => !m.seen && m.sender === "user").length;
 });
 
-
-ticketSchema.pre("save", function (next) {
+ticketSchema.pre("save", function () {
   if (this.isModified("messages")) {
     this.lastMessageAt = new Date();
   }
+  
 });
 
 module.exports = mongoose.model("Ticket", ticketSchema);

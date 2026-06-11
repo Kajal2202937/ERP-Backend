@@ -1,8 +1,8 @@
 const mongoose = require("mongoose");
-
+const AppError = require("../utils/AppError");
 const connectDB = async () => {
   if (!process.env.MONGO_URI) {
-    throw new Error("MONGO_URI is not defined in environment variables");
+    throw new AppError("MONGO_URI is not defined in environment variables");
   }
 
   try {

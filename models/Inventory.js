@@ -12,7 +12,7 @@ const inventorySchema = new mongoose.Schema(
     quantity: {
       type: Number,
       default: 0,
-      min: 0,
+      min: [0, "Quantity cannot go below 0"],
     },
 
     lowStockLimit: {
@@ -23,6 +23,7 @@ const inventorySchema = new mongoose.Schema(
     location: {
       type: String,
       default: "Main Warehouse",
+      trim: true,
     },
 
     isActive: {
@@ -30,7 +31,7 @@ const inventorySchema = new mongoose.Schema(
       default: true,
     },
 
-    archived: { 
+    archived: {
       type: Boolean,
       default: false,
     },
@@ -40,7 +41,15 @@ const inventorySchema = new mongoose.Schema(
       default: Date.now,
     },
   },
-  { timestamps: true },
+  {
+    timestamps: true,
+    versionKey: false,
+  },
 );
+
+inventorySchema.index({ isActive: 1, archived: 1, quantity: 1 });
+inventorySchema.index({ updatedAt: -1 });
+
+inventorySchema.index({ lastUpdated: -1 });
 
 module.exports = mongoose.model("Inventory", inventorySchema);

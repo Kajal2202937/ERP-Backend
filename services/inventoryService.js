@@ -1,14 +1,17 @@
+const mongoose = require("mongoose");
 const Inventory = require("../models/Inventory");
+const Product = require("../models/Product");
 const { updateStock: stockEngine } = require("./stockService");
+const AppError = require("../utils/AppError");
+
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 exports.createInventory = async (data) => {
-  if (!data.product) throw new Error("Product is required");
+  if (!data.product) throw new AppError("Product is required", 400);
 
   const existing = await Inventory.findOne({ product: data.product });
-
-  if (existing) {
-    throw new Error("Inventory already exists for this product");
-  }
+  if (existing)
+    throw new AppError("Inventory already exists for this product", 409);
 
   return await Inventory.create({
     product: data.product,
@@ -21,33 +24,32 @@ exports.createInventory = async (data) => {
 };
 
 exports.getInventory = async (query) => {
-  const page = Math.max(parseInt(query.page) || 1, 1);
-  const limit = Math.max(parseInt(query.limit) || 10, 1);
-  const skip = (page - 1) * limit;
+  if (query.mode === "dropdown" || query.all === "true") {
+    const inv = await Inventory.find({ archived: { $ne: true } })
+      .populate("product", "_id name sku status")
+      .sort({ "product.name": 1 })
+      .lean();
 
+    return {
+      data: inv,
+      total: inv.length,
+      page: 1,
+      totalPages: 1,
+    };
+  }
+
+  const page = Math.max(parseInt(query.page) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(query.limit) || 10, 1), 1000);
+  const skip = (page - 1) * limit;
   const search = query.search?.trim();
 
-  const match = {
-    archived: { $ne: true },
-  };
+  const match = { archived: { $ne: true } };
 
-  if (query.stock === "low") {
-    match.quantity = { $gt: 0, $lte: 10 };
-  }
+  if (query.stock === "out") match.quantity = 0;
+  if (query.status === "active") match.isActive = true;
+  if (query.status === "disabled") match.isActive = false;
 
-  if (query.stock === "out") {
-    match.quantity = 0;
-  }
-
-  if (query.status === "active") {
-    match.isActive = true;
-  }
-
-  if (query.status === "disabled") {
-    match.isActive = false;
-  }
-
-  const pipeline = [
+  const matchStages = [
     {
       $lookup: {
         from: "products",
@@ -63,8 +65,13 @@ exports.getInventory = async (query) => {
           {
             $match: {
               $or: [
-                { "product.name": { $regex: search, $options: "i" } },
-                { location: { $regex: search, $options: "i" } },
+                {
+                  "product.name": {
+                    $regex: escapeRegex(search),
+                    $options: "i",
+                  },
+                },
+                { location: { $regex: escapeRegex(search), $options: "i" } },
               ],
             },
           },
@@ -72,39 +79,68 @@ exports.getInventory = async (query) => {
       : []),
 
     { $match: match },
-
-    { $sort: { createdAt: -1 } },
-    { $skip: skip },
-    { $limit: limit },
   ];
 
-  const data = await Inventory.aggregate(pipeline);
+  const pipeline = [...matchStages];
 
-  const totalResult = await Inventory.aggregate([
-    ...pipeline.slice(0, -3),
-    { $count: "total" },
+  if (query.stock === "low") {
+    pipeline.push({
+      $match: {
+        $expr: {
+          $and: [
+            { $gt: ["$quantity", 0] },
+            { $lte: ["$quantity", "$lowStockLimit"] },
+          ],
+        },
+      },
+    });
+  }
+
+  const [result] = await Inventory.aggregate([
+    ...pipeline,
+    {
+      $facet: {
+        data: [
+          { $sort: { createdAt: -1 } },
+          { $skip: skip },
+          { $limit: limit },
+        ],
+        total: [{ $count: "count" }],
+      },
+    },
   ]);
 
-  const total = totalResult[0]?.total || 0;
+  const totalCount = result?.total?.[0]?.count ?? 0;
+
+  const allInventory = await Inventory.find({
+    archived: { $ne: true },
+  }).lean();
+
+  const summary = {
+    total: allInventory.length,
+    lowStock: allInventory.filter(
+      (item) => item.quantity > 0 && item.quantity <= item.lowStockLimit,
+    ).length,
+    outOfStock: allInventory.filter((item) => item.quantity === 0).length,
+    active: allInventory.filter((item) => item.isActive).length,
+  };
 
   return {
-    data,
-    total,
+    data: result?.data ?? [],
+    total: totalCount,
     page,
-    totalPages: Math.ceil(total / limit) || 1,
+    totalPages: Math.ceil(totalCount / limit) || 1,
+    summary,
   };
 };
 
 exports.addStock = async (productId, qty) => {
   const quantity = Number(qty);
-
-  if (!productId) throw new Error("productId is required");
-  if (isNaN(quantity) || quantity <= 0) {
-    throw new Error("Invalid quantity");
-  }
+  if (!productId) throw new AppError("productId is required", 400);
+  if (isNaN(quantity) || quantity <= 0)
+    throw new AppError("Invalid quantity", 400);
 
   const inventory = await Inventory.findOne({ product: productId });
-
   if (!inventory) {
     return await Inventory.create({
       product: productId,
@@ -114,29 +150,20 @@ exports.addStock = async (productId, qty) => {
     });
   }
 
-  await stockEngine({
-    productId,
-    quantity,
-    type: "IN",
-  });
-
+  await stockEngine({ productId, quantity, type: "IN" });
   return await Inventory.findOne({ product: productId });
 };
 
 exports.updateStock = async (productId, qty) => {
   const quantity = Number(qty);
-
-  if (!productId) throw new Error("productId is required");
-  if (isNaN(quantity) || quantity < 0) {
-    throw new Error("Invalid quantity");
-  }
+  if (!productId) throw new AppError("productId is required", 400);
+  if (isNaN(quantity) || quantity < 0)
+    throw new AppError("Invalid quantity", 400);
 
   const inventory = await Inventory.findOne({ product: productId });
-
-  if (!inventory) throw new Error("Inventory not found");
+  if (!inventory) throw new AppError("Inventory not found", 404);
 
   const diff = quantity - inventory.quantity;
-
   if (diff === 0) return inventory;
 
   await stockEngine({
@@ -144,51 +171,61 @@ exports.updateStock = async (productId, qty) => {
     quantity: Math.abs(diff),
     type: diff > 0 ? "IN" : "OUT",
   });
-
   return await Inventory.findOne({ product: productId });
 };
 
 exports.disableInventory = async (productId) => {
-  if (!productId) throw new Error("productId is required");
-
+  if (!productId) throw new AppError("productId is required", 400);
   const inventory = await Inventory.findOneAndUpdate(
     { product: productId },
     { isActive: false, lastUpdated: new Date() },
     { new: true },
   );
-
-  if (!inventory) throw new Error("Inventory not found");
-
+  if (!inventory) throw new AppError("Inventory not found", 404);
   return inventory;
 };
 
 exports.enableInventory = async (productId) => {
-  if (!productId) throw new Error("productId is required");
-
+  if (!productId) throw new AppError("productId is required", 400);
   const inventory = await Inventory.findOneAndUpdate(
     { product: productId },
     { isActive: true, lastUpdated: new Date() },
     { new: true },
   );
-
-  if (!inventory) throw new Error("Inventory not found");
-
+  if (!inventory) throw new AppError("Inventory not found", 404);
   return inventory;
 };
 
 exports.deleteInventory = async (productIds) => {
   const ids = Array.isArray(productIds) ? productIds : [productIds];
+  if (!ids.length) throw new AppError("productIds required", 400);
 
-  if (!ids.length) throw new Error("productIds required");
+  const validIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
+  if (!validIds.length)
+    throw new AppError("No valid product IDs provided", 400);
 
-  return await Inventory.updateMany(
-    { product: { $in: ids } },
-    {
-      $set: {
-        isActive: false,
-        archived: true,
-        lastUpdated: new Date(),
-      },
-    },
-  );
+  const session = await mongoose.startSession();
+  let result;
+
+  try {
+    await session.withTransaction(async () => {
+      await Inventory.updateMany(
+        { product: { $in: validIds } },
+        { $set: { isActive: false, archived: true, lastUpdated: new Date() } },
+        { session },
+      );
+
+      result = await Product.deleteMany(
+        { _id: { $in: validIds } },
+        { session },
+      );
+    });
+  } finally {
+    session.endSession();
+  }
+
+  return {
+    inventoryArchived: validIds.length,
+    productsDeleted: result?.deletedCount ?? 0,
+  };
 };

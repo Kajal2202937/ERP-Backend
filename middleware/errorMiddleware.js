@@ -23,7 +23,14 @@ const handleJWTError = () =>
 const handleJWTExpiredError = () =>
   new AppError("Your token has expired. Please log in again.", 401);
 
+const handleCsrfError = () =>
+  new AppError("Invalid or missing CSRF token.", 403);
+
 const sendErrorDev = (err, res) => {
+  if (process.env.NODE_ENV === "production") {
+    return sendErrorProd(err, res);
+  }
+
   res.status(err.statusCode).json({
     success: false,
     status: err.status,
@@ -35,19 +42,29 @@ const sendErrorDev = (err, res) => {
 
 const sendErrorProd = (err, res) => {
   if (err.isOperational) {
-    res.status(err.statusCode).json({
+    return res.status(err.statusCode).json({
       success: false,
       status: err.status,
       message: err.message,
     });
-  } else {
-    console.error("💥 UNEXPECTED ERROR:", err);
-    res.status(500).json({
-      success: false,
-      status: "error",
-      message: "Something went wrong. Please try again later.",
-    });
   }
+
+  console.error(
+    JSON.stringify({
+      level: "error",
+      msg: "unhandled-error",
+      name: err.name,
+      message: err.message,
+      stack: err.stack,
+      ts: new Date().toISOString(),
+    }),
+  );
+
+  res.status(500).json({
+    success: false,
+    status: "error",
+    message: "Something went wrong. Please try again later.",
+  });
 };
 
 const errorHandler = (err, req, res, next) => {
@@ -65,6 +82,8 @@ const errorHandler = (err, req, res, next) => {
       error = handleValidationErrorDB(error);
     if (error.name === "JsonWebTokenError") error = handleJWTError();
     if (error.name === "TokenExpiredError") error = handleJWTExpiredError();
+
+    if (error.code === "EBADCSRFTOKEN") error = handleCsrfError();
 
     sendErrorProd(error, res);
   }

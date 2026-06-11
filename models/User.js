@@ -31,8 +31,7 @@ const DEFAULT_PERMISSIONS = {
     "ticket:read",
     "ticket:update",
     "ticket:delete",
-    "settings:read",
-    "settings:update",
+
   ],
   manager: [
     "product:create",
@@ -84,14 +83,17 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: [true, "Password is required"],
-      minlength: [6, "Password must be at least 6 characters"],
+      minlength: [8, "Password must be at least 8 characters"],
       select: false,
     },
 
     phone: {
       type: String,
       trim: true,
-      match: [/^[0-9]{10}$/, "Phone number must be exactly 10 digits"],
+      match: [
+        /^\+?[0-9]{7,15}$/,
+        "Phone number must be 7–15 digits, optionally preceded by +",
+      ],
     },
 
     role: {
@@ -119,18 +121,28 @@ const userSchema = new mongoose.Schema(
       default: "active",
     },
 
+    tokenVersion: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
     },
+
+    passwordResetToken: { type: String, select: false },
+    passwordResetExpires: { type: Date, select: false },
   },
   {
     timestamps: true,
+    versionKey: false,
   },
 );
 
-userSchema.pre("save", function (next) {
+userSchema.pre("save", function () {
   if (this.isModified("status")) {
     this.isActive = this.status === "active";
   }
@@ -138,17 +150,13 @@ userSchema.pre("save", function (next) {
     this.status = this.isActive ? "active" : "inactive";
   }
 
-  if (
-    (this.isNew || this.isModified("role")) &&
-    (!this.permissions || this.permissions.length === 0)
-  ) {
+  if (this.isNew || this.isModified("role")) {
     this.permissions = DEFAULT_PERMISSIONS[this.role] || [];
   }
-
 });
 
 userSchema.methods.hasPermission = function (permission) {
-  return this.permissions.includes(permission);
+  return DEFAULT_PERMISSIONS[this.role]?.includes(permission) ?? false;
 };
 
 userSchema.methods.toPublicJSON = function () {
@@ -160,7 +168,7 @@ userSchema.methods.toPublicJSON = function () {
     role: this.role,
     status: this.status,
     isActive: this.isActive,
-    permissions: this.permissions,
+    permissions: DEFAULT_PERMISSIONS[this.role] || [],
     createdBy: this.createdBy,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,

@@ -1,5 +1,6 @@
 const asyncHandler = require("../middleware/asyncHandler");
 const AppError = require("../utils/AppError");
+const { AI_LIMITS } = require("../services/ai/openaiService");
 
 const {
   erpAssistantChat,
@@ -23,14 +24,68 @@ const {
   getTopProductsService,
 } = require("../services/reportService");
 
+const CHAT_LIMITS = {
+  MAX_HISTORY: AI_LIMITS.MAX_MESSAGES,
+  MAX_MSG_CHARS: AI_LIMITS.MAX_MSG_CHARS,
+  MAX_CONTEXT_KEYS: 4,
+  MAX_NOTE_CHARS: 200,
+};
+
 exports.assistantChat = asyncHandler(async (req, res) => {
-  const { history = [], context = {} } = req.body;
+  const { history, context } = req.body;
 
-  if (!Array.isArray(history))
-    throw new AppError("history must be an array", 400);
-  if (history.length === 0) throw new AppError("history cannot be empty", 400);
+  if (!Array.isArray(history)) {
+    throw new AppError("history must be an array of message objects", 400);
+  }
+  if (history.length === 0) {
+    throw new AppError("history cannot be empty", 400);
+  }
 
-  const reply = await erpAssistantChat(history, context);
+  if (history.length > CHAT_LIMITS.MAX_HISTORY) {
+    console.warn(
+      `[AI] Chat history truncated: ${history.length} → ${CHAT_LIMITS.MAX_HISTORY} messages | user: ${req.user._id}`,
+    );
+  }
+
+  const VALID_ROLES = new Set(["user", "assistant"]);
+  for (const msg of history) {
+    if (!msg || typeof msg !== "object" || Array.isArray(msg)) {
+      throw new AppError(
+        "Each history item must be an object with role and content",
+        400,
+      );
+    }
+
+    if (!VALID_ROLES.has(msg.role)) {
+      throw new AppError(
+        `Invalid message role "${msg.role}". Must be "user" or "assistant"`,
+        400,
+      );
+    }
+
+    if (typeof msg.content !== "string" || msg.content.trim().length === 0) {
+      throw new AppError(
+        "Each message must have non-empty string content",
+        400,
+      );
+    }
+
+    if (msg.content.length > CHAT_LIMITS.MAX_MSG_CHARS * 2) {
+      console.warn(
+        `[AI] Oversized message (${msg.content.length} chars) from user: ${req.user._id}`,
+      );
+    }
+  }
+
+  const rawCtx = context && typeof context === "object" ? context : {};
+  const safeContext = {
+    totalOrders: Number(rawCtx.totalOrders) || 0,
+    totalRevenue: Number(rawCtx.totalRevenue) || 0,
+    activeSuppliers: Number(rawCtx.activeSuppliers) || 0,
+    lowStock: Number(rawCtx.lowStock) || 0,
+  };
+
+  const reply = await erpAssistantChat(history, safeContext);
 
   res.json({ success: true, data: { reply } });
 });
@@ -74,13 +129,19 @@ exports.summariseInvoice = asyncHandler(async (req, res) => {
 
 exports.generateInvoiceEmail = asyncHandler(async (req, res) => {
   const { recipientName } = req.body;
+
+  const safeRecipientName =
+    typeof recipientName === "string"
+      ? recipientName.trim().slice(0, CHAT_LIMITS.MAX_NOTE_CHARS)
+      : "Customer";
+
   const order = await Order.findById(req.params.id).populate({
     path: "product",
     populate: { path: "supplier", select: "name email" },
   });
   if (!order) throw new AppError("Order not found", 404);
 
-  const email = await generateInvoiceEmail(order.toObject(), recipientName);
+  const email = await generateInvoiceEmail(order.toObject(), safeRecipientName);
   res.json({ success: true, data: { email } });
 });
 
@@ -93,7 +154,10 @@ exports.analyseSupplier = asyncHandler(async (req, res) => {
 });
 
 exports.supplierRiskReport = asyncHandler(async (req, res) => {
-  const suppliers = await Supplier.find().lean();
+  const MAX_SUPPLIERS_FOR_AI = 20;
+
+  const suppliers = await Supplier.find().limit(MAX_SUPPLIERS_FOR_AI).lean();
+
   if (!suppliers.length) throw new AppError("No suppliers found", 404);
 
   const report = await bulkSupplierRisk(suppliers);

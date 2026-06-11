@@ -1,8 +1,8 @@
-const express10 = require("express");
-const router10 = express10.Router();
+const express = require("express");
+const router = express.Router();
 const { getAIInsights } = require("../controllers/insightController");
-const { protect: p10 } = require("../middleware/authMiddleware");
+const { protect: p } = require("../middleware/authMiddleware");
 
-router10.get("/", p10, getAIInsights);
+router.get("/", p, getAIInsights);
 
-module.exports = router10;
+module.exports = router;

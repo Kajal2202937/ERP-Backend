@@ -1,11 +1,12 @@
 const mongoose = require("mongoose");
 const Ticket = require("../models/Ticket");
 const generateTicketId = require("../utils/generateTicketId");
+const AppError = require("../utils/AppError");
 
 const createTicket = async ({ name, email, subject, message }) => {
-  if (!name?.trim()) throw new Error("Name is required");
-  if (!email?.trim()) throw new Error("Email is required");
-  if (!message?.trim()) throw new Error("Message is required");
+  if (!name?.trim()) throw new AppError("Name is required");
+  if (!email?.trim()) throw new AppError("Email is required");
+  if (!message?.trim()) throw new AppError("Message is required");
 
   const ticketId = await generateTicketId();
 
@@ -80,7 +81,7 @@ const getTicketById = async (id) => {
     .populate("assignedTo", "name email")
     .lean({ virtuals: true });
 
-  if (!ticket) throw new Error("Ticket not found");
+  if (!ticket) throw new AppError("Ticket not found");
   return ticket;
 };
 
@@ -89,18 +90,18 @@ const getTicketByTicketId = async (ticketId) => {
     .populate("assignedTo", "name email")
     .lean({ virtuals: true });
 
-  if (!ticket) throw new Error("Ticket not found");
+  if (!ticket) throw new AppError("Ticket not found");
   return ticket;
 };
 
 const addMessage = async (id, message, sender) => {
   if (!mongoose.Types.ObjectId.isValid(id))
-    throw new Error("Invalid ticket ID");
-  if (!message?.trim()) throw new Error("Message is required");
-  if (!["admin", "user"].includes(sender)) throw new Error("Invalid sender");
+    throw new AppError("Invalid ticket ID");
+  if (!message?.trim()) throw new AppError("Message is required");
+  if (!["admin", "user"].includes(sender)) throw new AppError("Invalid sender");
 
   const ticket = await Ticket.findById(id);
-  if (!ticket) throw new Error("Ticket not found");
+  if (!ticket) throw new AppError("Ticket not found");
 
   ticket.messages.push({
     message: message.trim(),
@@ -133,7 +134,7 @@ const updateTicketStatus = async (id, status) => {
     "resolved",
     "closed",
   ];
-  if (!validStatuses.includes(status)) throw new Error("Invalid status");
+  if (!validStatuses.includes(status)) throw new AppError("Invalid status");
 
   const update = { status };
   if (status === "resolved") {
@@ -145,7 +146,7 @@ const updateTicketStatus = async (id, status) => {
     runValidators: true,
   });
 
-  if (!ticket) throw new Error("Ticket not found");
+  if (!ticket) throw new AppError("Ticket not found");
   return ticket;
 };
 
@@ -155,7 +156,7 @@ const updateTicketPriority = async (id, priority) => {
     { priority },
     { new: true, runValidators: true },
   );
-  if (!ticket) throw new Error("Ticket not found");
+  if (!ticket) throw new AppError("Ticket not found");
   return ticket;
 };
 
@@ -165,7 +166,7 @@ const resolveTicket = async (id) => {
     { status: "resolved", resolvedAt: new Date() },
     { new: true },
   );
-  if (!ticket) throw new Error("Ticket not found");
+  if (!ticket) throw new AppError("Ticket not found");
   return ticket;
 };
 
@@ -188,7 +189,7 @@ const markMessagesSeen = async (ticketId, viewer) => {
 
 const deleteTicket = async (id) => {
   const ticket = await Ticket.findByIdAndDelete(id);
-  if (!ticket) throw new Error("Ticket not found");
+  if (!ticket) throw new AppError("Ticket not found");
   return true;
 };
 

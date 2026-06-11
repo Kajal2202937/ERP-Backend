@@ -1,14 +1,17 @@
-const express8 = require("express");
-const router8 = express8.Router();
+const express = require("express");
+const router = express.Router();
 const {
   getSalesSummary,
   getSalesTrend,
   getTopProducts,
+  getDashboardSummary,
 } = require("../controllers/reportController");
-const { protect: p8 } = require("../middleware/authMiddleware");
+const { protect, authorize } = require("../middleware/authMiddleware");
 
-router8.get("/sales", p8, getSalesSummary);
-router8.get("/sales-trend", p8, getSalesTrend);
-router8.get("/top-products", p8, getTopProducts);
+router.get("/dashboard/summary", protect, getDashboardSummary);
 
-module.exports = router8;
+router.get("/sales", protect, getSalesSummary);
+router.get("/sales-trend", protect, getSalesTrend);
+router.get("/top-products", protect, getTopProducts);
+
+module.exports = router;

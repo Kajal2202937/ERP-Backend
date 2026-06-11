@@ -1,10 +1,9 @@
 const productionService = require("../services/productionService");
 const productionReportService = require("../services/productionReportService");
-const asyncHandler4 = require("../middleware/asyncHandler");
+const asyncHandler = require("../middleware/asyncHandler");
 
-exports.getProductionReport = asyncHandler4(async (req, res) => {
+exports.getProductionReport = asyncHandler(async (req, res) => {
   const { startDate, endDate } = req.query;
-
   const result = await productionReportService.getProductionReportData(
     startDate,
     endDate,
@@ -12,17 +11,17 @@ exports.getProductionReport = asyncHandler4(async (req, res) => {
   res.json({ success: true, ...result });
 });
 
-exports.createProduction = asyncHandler4(async (req, res) => {
+exports.createProduction = asyncHandler(async (req, res) => {
   const data = await productionService.createProduction(req.body);
   res.status(201).json({ success: true, data });
 });
 
-exports.getProductions = asyncHandler4(async (req, res) => {
-  const data = await productionService.getProductions();
-  res.json({ success: true, data });
+exports.getProductions = asyncHandler(async (req, res) => {
+  const result = await productionService.getProductions(req.query);
+  res.json({ success: true, ...result });
 });
 
-exports.updateProduction = asyncHandler4(async (req, res) => {
+exports.updateProduction = asyncHandler(async (req, res) => {
   const data = await productionService.updateProduction(
     req.params.id,
     req.body,
@@ -30,7 +29,7 @@ exports.updateProduction = asyncHandler4(async (req, res) => {
   res.json({ success: true, data });
 });
 
-exports.deleteProduction = asyncHandler4(async (req, res) => {
+exports.deleteProduction = asyncHandler(async (req, res) => {
   await productionService.deleteProduction(req.params.id);
   res.json({
     success: true,

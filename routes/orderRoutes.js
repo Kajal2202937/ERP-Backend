@@ -1,16 +1,53 @@
-const express5 = require("express");
-const router5 = express5.Router();
+const express = require("express");
+const router  = express.Router();
+
 const {
-  createOrder,
-  getOrders,
-  updateOrderStatus,
-  deleteOrder,
+  createOrder, getOrders, getOrderById,
+  updateOrderStatus, deleteOrder, resendInvoice,
 } = require("../controllers/orderController");
-const { protect: p5, authorize: a5 } = require("../middleware/authMiddleware");
 
-router5.post("/", p5, createOrder);
-router5.get("/", p5, getOrders);
-router5.patch("/:id/status", p5, updateOrderStatus);
-router5.delete("/:id", p5, a5("admin"), deleteOrder);
+const { protect, authorize }  = require("../middleware/authMiddleware");
+const { validate, validateParams } = require("../middleware/validate");
+const { auditMiddleware }     = require("../middleware/auditLog");
 
-module.exports = router5;
+const {
+  createOrderSchema,
+  updateOrderStatusSchema,
+  orderIdParamSchema,
+} = require("../validation/orderSchemas");
+
+router.get("/",    protect, getOrders);
+router.get("/:id", protect, validateParams(orderIdParamSchema), getOrderById);
+
+router.post("/",
+  protect,
+  validate(createOrderSchema),
+  auditMiddleware("CREATE", "Order", (req) => `Order created for product ${req.body.product}`),
+  createOrder,
+);
+
+router.post("/:id/resend-invoice",
+  protect,
+  authorize("admin", "manager"),
+  validateParams(orderIdParamSchema),
+  resendInvoice,
+);
+
+router.patch("/:id/status",
+  protect,
+  authorize("admin", "manager"),
+  validateParams(orderIdParamSchema),
+  validate(updateOrderStatusSchema),
+  auditMiddleware("STATUS_CHANGE", "Order", (req) => `Order ${req.params.id} status → ${req.body.status}`),
+  updateOrderStatus,
+);
+
+router.delete("/:id",
+  protect,
+  authorize("admin"),
+  validateParams(orderIdParamSchema),
+  auditMiddleware("DELETE", "Order", (req) => `Order ${req.params.id} deleted`),
+  deleteOrder,
+);
+
+module.exports = router;

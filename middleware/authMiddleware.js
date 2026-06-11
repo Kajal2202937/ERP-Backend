@@ -18,13 +18,19 @@ exports.protect = asyncHandler(async (req, res, next) => {
 
   const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-  const user = await User.findById(decoded.id).select("-password");
+  const user = await User.findById(decoded.id).select(
+    "-password +tokenVersion",
+  );
 
   if (!user) {
     throw new AppError(
       "The user belonging to this token no longer exists.",
       401,
     );
+  }
+
+  if (decoded.tv !== user.tokenVersion) {
+    throw new AppError("Your session has expired. Please log in again.", 401);
   }
 
   if (!user.isActive) {
@@ -34,6 +40,7 @@ exports.protect = asyncHandler(async (req, res, next) => {
     );
   }
 
+  user.tokenVersion = undefined;
   req.user = user;
   next();
 });
