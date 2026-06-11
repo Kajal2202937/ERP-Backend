@@ -9,10 +9,12 @@ const VALID_ROLES = ["admin", "manager", "staff", "employee"];
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const COOKIE_NAME = "token";
+const IS_PROD = process.env.NODE_ENV === "production";
+
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "strict",
+  secure: IS_PROD,
+  sameSite: IS_PROD ? "none" : "lax",
   maxAge: 7 * 24 * 60 * 60 * 1000,
   path: "/",
 };
@@ -145,6 +147,7 @@ exports.loginUser = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: "Login successful",
+    token,
     data: user.toPublicJSON(),
   });
 });

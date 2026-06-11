@@ -12,10 +12,16 @@ exports.protect = asyncHandler(async (req, res, next) => {
     token = req.cookies.token;
   }
 
-  if (!token) {
-    throw new AppError("Not authorized. Please log in.", 401);
-  }
+if (!token) {
+  console.log("AUTH DEBUG:", {
+    cookieToken: !!req.cookies?.token,
+    authHeader: req.headers.authorization,
+    cookies: req.cookies,
+    origin: req.headers.origin,
+  });
 
+  throw new AppError("Not authorized. Please log in.", 401);
+}
   const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
   const user = await User.findById(decoded.id).select(
