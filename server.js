@@ -201,15 +201,7 @@ if (!process.env.CSRF_SECRET || process.env.CSRF_SECRET.length < 32) {
 
 const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   getSecret: () => process.env.CSRF_SECRET,
-
-  // FIX: Use only the first IP from x-forwarded-for (the real client IP).
-  // Render and other reverse proxies append their own IPs to x-forwarded-for,
-  // producing a comma-separated list that can differ between requests routed
-  // through different proxy hops. Using the raw header caused the CSRF HMAC
-  // computed at token-generation time to not match the HMAC recomputed at
-  // validation time, resulting in a 403 on every POST from this deployment.
-  // req.ip (with trust proxy: 1) is already the first trusted IP and is stable.
-  getSessionIdentifier: (req) => req.ip || "anon",
+  getSessionIdentifier: () => "",
 
   cookieName: IS_PROD ? "__Host-csrf" : "csrf",
 
@@ -225,6 +217,7 @@ const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   ignoredMethods: ["GET", "HEAD", "OPTIONS"],
   ignoredPathPrefixes: ["/socket.io"],
 });
+
 const makeLimiter = (options) => {
   const redisClient = getRedisClient();
   const store = redisClient
@@ -305,7 +298,13 @@ const startServer = async () => {
     app.use(doubleCsrfProtection);
 
     app.get("/api/csrf-token", (req, res) => {
-      const token = generateCsrfToken(req, res);
+      res.set({
+        "Cache-Control":
+          "no-store, no-cache, must-revalidate, proxy-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+      });
+      const token = generateCsrfToken(req, res, { overwrite: true });
       res.status(200).json({ csrfToken: token });
     });
 
