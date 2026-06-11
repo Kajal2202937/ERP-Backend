@@ -202,8 +202,14 @@ if (!process.env.CSRF_SECRET || process.env.CSRF_SECRET.length < 32) {
 const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   getSecret: () => process.env.CSRF_SECRET,
 
-  getSessionIdentifier: (req) =>
-    req.headers["x-forwarded-for"] || req.ip || "anon",
+  // FIX: Use only the first IP from x-forwarded-for (the real client IP).
+  // Render and other reverse proxies append their own IPs to x-forwarded-for,
+  // producing a comma-separated list that can differ between requests routed
+  // through different proxy hops. Using the raw header caused the CSRF HMAC
+  // computed at token-generation time to not match the HMAC recomputed at
+  // validation time, resulting in a 403 on every POST from this deployment.
+  // req.ip (with trust proxy: 1) is already the first trusted IP and is stable.
+  getSessionIdentifier: (req) => req.ip || "anon",
 
   cookieName: IS_PROD ? "__Host-csrf" : "csrf",
 
