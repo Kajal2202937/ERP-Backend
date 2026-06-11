@@ -201,19 +201,24 @@ if (!process.env.CSRF_SECRET || process.env.CSRF_SECRET.length < 32) {
 
 const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   getSecret: () => process.env.CSRF_SECRET,
-  getSessionIdentifier: (req) => req.ip ?? "anon",
+
+  getSessionIdentifier: (req) =>
+    req.headers["x-forwarded-for"] || req.ip || "anon",
+
   cookieName: IS_PROD ? "__Host-csrf" : "csrf",
+
   cookieOptions: {
     httpOnly: true,
-    sameSite: "strict",
-    secure: IS_PROD,
+    secure: true,
+    sameSite: "none",
     path: "/",
   },
+
   getCsrfTokenFromRequest: (req) => req.headers["x-csrf-token"],
+
   ignoredMethods: ["GET", "HEAD", "OPTIONS"],
   ignoredPathPrefixes: ["/socket.io"],
 });
-
 const makeLimiter = (options) => {
   const redisClient = getRedisClient();
   const store = redisClient
@@ -313,6 +318,22 @@ const startServer = async () => {
     app.use("/api/audit", globalLimiter, auditRoutes);
 
     app.use(notFound);
+    app.use((err, req, res, next) => {
+      if (
+        err?.message?.toLowerCase().includes("csrf") ||
+        err?.code === "EBADCSRFTOKEN"
+      ) {
+        console.error("CSRF ERROR", {
+          path: req.path,
+          method: req.method,
+          origin: req.headers.origin,
+          csrfHeader: req.headers["x-csrf-token"],
+          cookies: req.cookies,
+        });
+      }
+
+      next(err);
+    });
     app.use(errorHandler);
 
     const server = http.createServer(app);
